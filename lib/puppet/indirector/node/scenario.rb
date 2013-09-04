@@ -1,7 +1,8 @@
+require 'puppet/indirector/terminus'
 require 'puppet/node'
 require 'yaml'
 
-class Puppet::Node::Exec < Puppet::Indirector::Exec
+class Puppet::Node::Scenario < Puppet::Indirector::Yaml
   desc <<-EOT
 
 Defer to an external group of yaml config files to drive classification
@@ -48,7 +49,7 @@ This file maps nodes to the roles that they should be assigned.
     global_config = get_global_config
 
     # get the scenario
-    scenario = global_config[:scenario]
+    scenario = global_config["scenario"]
 
     # retrieve classes per roles from scenario
     roles = get_role_classes_from_scenario(scenario)
@@ -57,7 +58,7 @@ This file maps nodes to the roles that they should be assigned.
     class_list = roles[get_role(request.key)]
 
     # set parameters and class in the node
-    node.parameters=global_configs
+    node.parameters=global_config
     node.classes=class_list
 
     # merge facts into the node
@@ -71,8 +72,8 @@ This file maps nodes to the roles that they should be assigned.
     Puppet[:confdir]
   end
 
-  def datadir
-    @data_dir = File.join(Puppet[:confdir], 'data')
+  def data_dir
+    @data_dir ||= File.join(Puppet[:confdir], 'data')
   end
 
   # load the global config from $confdir/data/config.yaml
@@ -83,7 +84,7 @@ This file maps nodes to the roles that they should be assigned.
     unless File.exists?(global_config_file)
       raise(Exception, "#{global_config_file} does not exist")
     end
-    global_config = YAML.load(global_config_file)
+    global_config = YAML.load_file(global_config_file)
     unless global_config['scenario']
       raise(Exception, 'global config must specify key "scenario"')
     end
@@ -96,7 +97,7 @@ This file maps nodes to the roles that they should be assigned.
     role_classes = {}
     # iterate through each roles in a scenario
     get_scenario_data(name)['roles'].each do |role_name, values|
-      role_classes['role_name'] = values['classes'] + get_classes_from_groups(values[''])
+      role_classes[role_name] = (values['classes'] || []) + get_classes_from_groups(values['class_groups'])
     end
     role_classes
   end
@@ -104,32 +105,36 @@ This file maps nodes to the roles that they should be assigned.
   # load a scenario's YAML
   def get_scenario_data(name)
     scenario_file = File.join(data_dir, 'scenarios', "#{name}.yaml")
-    unless File.exsits?(scenario_file)
+    unless File.exists?(scenario_file)
       raise(Exception, "scenario file #{scenario_file} does not exist")
     end
-    YAML.load(scenario_file)
+    YAML.load_file(scenario_file)
   end
 
   # returns all classes in the specified groups
   def get_classes_from_groups(group_names)
     # expect that each group file
-    group_dir = File.join(data_dir, 'class_groups')
-    group_names.reduce([]) do |result, name|
-      group_file = File.join(group_dir, "#{name}.yaml")
-      unless File.exists?(group_file)
-        raise(Exception, "Group file #{group_file} does not exist")
+    if group_names
+      group_dir = File.join(data_dir, 'class_groups')
+      group_names.reduce([]) do |result, name|
+        group_file = File.join(group_dir, "#{name}.yaml")
+        unless File.exists?(group_file)
+          raise(Exception, "Group file #{group_file} does not exist")
+        end
+        result + YAML.load_file(group_file)
       end
-      result + YAML.load(group_file)
+    else
+      []
     end
   end
 
 
   def get_role(name)
-    role_mapper = File.join(datadir, 'role_mappings.yaml')
+    role_mapper = File.join(data_dir, 'role_mappings.yaml')
     unless File.exists?(role_mapper)
       raise(Exception, "Role mapping file: #{role_mapper} should exist")
     end
-    YAML.load(role_mapper)[name]
+    YAML.load_file(role_mapper)[name]
   end
 
 end
