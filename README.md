@@ -9,8 +9,10 @@ for scenarios based deployments
 2. synchronize it's plugins
 3. configure puppet.conf
 
-    [master]
-      node_terminus=scenario
+```
+[master]
+  node_terminus=scenario
+```
 
 # usage
 
@@ -24,8 +26,7 @@ Configure the following yaml files in /etc/puppet/data
     Directory that contains the possible deployment scenarios.
     Each scenario contains the following:
 
-** roles - list of roles that exist as a part of that scenario
-*** each role contains a list of classes specified as either classes or class_groups
+  * roles - list of roles that exist as a part of that scenario. Each role contains a list of classes specified as either classes or class_groups.
 
 * class_groups/<name>.yaml
 
