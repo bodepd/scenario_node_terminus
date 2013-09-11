@@ -60,7 +60,7 @@ This file maps nodes to the roles that they should be assigned.
     raise(Exception, "Node: #{request.key} has no valid role assigned") unless roles
 
     @global_config['openstack_role'] = role
-    class_list = roles[role]
+    class_list = (roles[role] || [])
 
 
     # set parameters and class in the node
