@@ -52,20 +52,22 @@ This file maps nodes to the roles that they should be assigned.
     scenario = @global_config['scenario']
 
     # retrieve classes per roles from scenario
-    roles = get_role_classes_from_scenario(scenario)
+    # when scenario is supplied
+    if scenario
+      roles = get_role_classes_from_scenario(scenario)
 
-    # get classes from roles
-    role = get_role(request.key)
+      # get classes from roles
+      role = get_role(request.key)
 
-    raise(Exception, "Node: #{request.key} has no valid role assigned") unless roles
+      raise(Exception, "Node: #{request.key} has no valid role assigned") unless roles
 
-    @global_config['openstack_role'] = role
-    class_list = (roles[role] || [])
-
+      @global_config['openstack_role'] = role
+      class_list = roles[role]
+    end
 
     # set parameters and class in the node
-    node.parameters=@global_config
-    node.classes=class_list
+    node.parameters = @global_config
+    node.classes    = class_list || []
 
     # merge facts into the node
     node.fact_merge
@@ -86,13 +88,10 @@ This file maps nodes to the roles that they should be assigned.
   # and verify that it specifies a scenario
   def get_global_config
     # load the global configuration data
+    global_config = {}
     global_config_file = File.join(data_dir, 'config.yaml')
-    unless File.exists?(global_config_file)
-      raise(Exception, "#{global_config_file} does not exist")
-    end
-    global_config = YAML.load_file(global_config_file)
-    unless global_config['scenario']
-      raise(Exception, 'global config must specify key "scenario"')
+    if File.exists?(global_config_file)
+      global_config = YAML.load_file(global_config_file)
     end
     global_config
   end
