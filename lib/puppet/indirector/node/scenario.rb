@@ -154,7 +154,13 @@ This file maps nodes to the roles that they should be assigned.
     unless File.exists?(role_mapper)
       raise(Exception, "Role mapping file: #{role_mapper} should exist")
     end
-    YAML.load_file(role_mapper)[name]
+    role_mappings = YAML.load_file(role_mapper)
+    split_name = name.split('.')
+    split_name.size.times do |x|
+      cur_name = split_name[0..(split_name.size-x-1)].join('.')
+      return role_mappings[cur_name] if role_mappings[cur_name]
+    end
+    return nil
   end
 
 end
