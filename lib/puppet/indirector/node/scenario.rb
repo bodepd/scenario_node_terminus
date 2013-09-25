@@ -44,6 +44,8 @@ This file maps nodes to the roles that they should be assigned.
 
     # create a node
     node = Puppet::Node.new(request.key)
+
+    Puppet.debug("Looking up classes for #{request.key}")
     
     # get the global configuration
     @global_config = get_global_config
@@ -54,6 +56,7 @@ This file maps nodes to the roles that they should be assigned.
     # retrieve classes per roles from scenario
     # when scenario is supplied
     if scenario
+      Puppet.debug("Loading roles for scenario: #{scenario}")
       roles = get_role_classes_from_scenario(scenario)
 
       # get classes from roles
@@ -63,6 +66,8 @@ This file maps nodes to the roles that they should be assigned.
 
       @global_config['openstack_role'] = role
       class_list = roles[role]
+    else
+      Puppet.debug("Did not find a scenario, no classification will occur")
     end
 
     # set parameters and class in the node
@@ -158,8 +163,13 @@ This file maps nodes to the roles that they should be assigned.
     split_name = name.split('.')
     split_name.size.times do |x|
       cur_name = split_name[0..(split_name.size-x-1)].join('.')
-      return role_mappings[cur_name] if role_mappings[cur_name]
+      role = role_mappings[cur_name]
+      if role
+        Puppet.debug("Found role from role mappings: #{role}")
+        return role
+      end
     end
+    Puppet.debug("Did not find role mapping for #{name}")
     return nil
   end
 
