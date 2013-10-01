@@ -98,7 +98,8 @@ This file maps nodes to the roles that they should be assigned.
     if File.exists?(global_config_file)
       global_config = YAML.load_file(global_config_file)
     end
-    global_config
+    overrides = get_global_hiera_data({'scenario' => global_config["scenario"]})
+    global_config.merge(overrides)
   end
 
   # returns a hash that maps each role to all classes that will
@@ -171,6 +172,53 @@ This file maps nodes to the roles that they should be assigned.
     end
     Puppet.debug("Did not find role mapping for #{name}")
     return nil
+  end
+
+
+  #
+  # get all keys and their values for all global hiera config
+  #
+  def get_global_hiera_data(scope)
+    @global_hiera_data || begin
+      begin
+        require 'hiera'
+      rescue
+        return {}
+      end
+      # get the hiera config file
+      hiera_config_file  = File.join(Puppet[:confdir], 'hiera.yaml')
+      @global_hiera_data = {}
+      # iterate through all data sources from this config file
+      Hiera::Backend.datasources(
+        scope,
+        nil,
+        get_hierarchy(hiera_config_file)
+      ) do |source|
+        # search for data overrides in the global_hiera_params directory
+        yamlfile = File.join(data_dir, 'global_hiera_params', "#{source}.yaml")
+        if File.exists?(yamlfile)
+          config = YAML.load_file(yamlfile)
+          config.each do |k, v|
+            @global_hiera_data[k] ||= v
+          end
+        end
+      end 
+    end
+    @global_hiera_data
+  end
+
+  #
+  # get the hierarchy configured in the specified hiera file
+  # The hierarchy default to scenario/%{scenario}, common if
+  # if cannot find one
+  #
+  def get_hierarchy(file)
+    default_hierarchy = ["scenario/%{scenario}", 'common']
+    if File.exists?(file)
+      (YAML.load_file(file) || {})[:hierarchy] || default_hierarchy
+    else
+      default_hierarchy
+    end
   end
 
 end
