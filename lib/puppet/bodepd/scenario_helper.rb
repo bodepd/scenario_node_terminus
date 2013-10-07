@@ -17,31 +17,15 @@ module Puppet
         Puppet.debug("Looking up classes for #{node_name}")
 
         # get the global configuration
-        @global_config = get_global_config
+        global_config = get_global_config
+        node.parameters = global_config
 
-        # get the scenario
-        scenario = @global_config['scenario']
+        # get classes from roles
+        role                  = get_role(node_name)
+        global_config['role'] = role
 
-        # retrieve classes per roles from scenario
-        # when scenario is supplied
-        if scenario
-          Puppet.debug("Loading roles for scenario: #{scenario}")
-          roles = get_role_classes_from_scenario(scenario)
-
-          # get classes from roles
-          role = get_role(node_name)
-
-          raise(Exception, "Node: #{node_name} has no valid role assigned") unless roles
-
-          @global_config['openstack_role'] = role
-          class_list = roles[role]
-        else
-          Puppet.debug("Did not find a scenario, no classification will occur")
-        end
-
-        # set parameters and class in the node
-        node.parameters = @global_config
-        node.classes    = class_list || []
+        # get classes from scenario and role
+        node.classes = get_classes_per_scenario(global_config, role)
 
         # merge facts into the node
         node.fact_merge
@@ -49,6 +33,36 @@ module Puppet
         # pass the node back to Puppet
         node
       end
+
+      # returns a list of all classes assocated with a role
+      def get_classes_from_role(role)
+        global_config = get_global_config
+        get_classes_per_scenario(global_config, role)
+      end
+
+      def compile_everything(role)
+        global_config = get_global_config
+        class_list = get_classes_per_scenario(global_config, role)
+
+        # get all keys from data_mappings
+        data_mappings = get_keys_per_dir('data_mappings', global_config)
+
+        puts data_mappings.to_yaml
+        get_keys_per_dir('hiera_data', global_config)
+
+      end
+
+      def get_classes_per_scenario(global_config, role)
+        scenario = global_config['scenario']
+        if scenario
+          Puppet.debug("Loading roles for scenario: #{scenario}")
+          get_role_classes_from_scenario(scenario, global_config)[role]
+        else
+          Puppet.debug("Did not find a scenario, no classification will occur")
+          []
+        end
+      end
+
 
       # return a list of all class parameters from the hierarcy
       # based on the global variables that we currently know about
@@ -84,11 +98,11 @@ module Puppet
 
       # returns a hash that maps each role to all classes that will
       # be applied a part of that role
-      def get_role_classes_from_scenario(name)
+      def get_role_classes_from_scenario(name, scope)
         role_classes = {}
         # iterate through each roles in a scenario
         get_scenario_data(name)['roles'].each do |role_name, values|
-          role_classes[role_name] = (values['classes'] || []) + get_classes_from_groups(values['class_groups'])
+          role_classes[role_name] = (values['classes'] || []) + get_classes_from_groups(values['class_groups'], scope)
         end
         role_classes
       end
@@ -106,7 +120,7 @@ module Puppet
 
       # I may need to be clever enough to try to find dep loops
       # or not even allow class groups to contain class groups
-      def get_classes_from_groups(group_names)
+      def get_classes_from_groups(group_names, scope)
         # expect that each group file
         if group_names
           group_dir = File.join(data_dir, 'class_groups')
@@ -117,9 +131,9 @@ module Puppet
             end
             class_group = YAML.load_file(group_file)
             result +
-            (class_group['classes'] || []).map{|x| interpolate_string(x)} +
+            (class_group['classes'] || []).map{|x| interpolate_string(x, scope)} +
             get_classes_from_groups(
-              (class_group['class_groups'] || []).map{|x| interpolate_string(x)}
+              (class_group['class_groups'] || []).map{|x| interpolate_string(x, scope)}, scope
             )
           end
         else
@@ -127,10 +141,10 @@ module Puppet
         end
       end
 
-      def interpolate_string(string)
+      def interpolate_string(string, scope)
         string.gsub(/%\{([^\}]*)\}/) do
           name = $1
-          @global_config[$1] || raise(Exception, "Interpolation for #{name} failed")
+          scope[$1] || raise(Exception, "Interpolation for #{name} failed")
         end
       end
 
@@ -159,7 +173,7 @@ module Puppet
       # get all keys and their values for all global hiera config
       #
       def get_global_hiera_data(scope)
-        @global_hiera_data ||= get_keys_per_dir('global_hiera_params', scope)
+        get_keys_per_dir('global_hiera_params', scope)
       end
 
       #
@@ -167,31 +181,31 @@ module Puppet
       # and use it to retrieve all valid keys in hiera
       #
       def get_keys_per_dir(dir, scope={})
-        @global_hiera_data || begin
-          begin
-            require 'hiera'
-          rescue
-            return {}
-          end
-          # get the hiera config file
-          hiera_config_file  = File.join(Puppet[:confdir], 'hiera.yaml')
-          data = {}
-          # iterate through all data sources from this config file
-          Hiera::Backend.datasources(
-            scope,
-            nil,
-            get_hierarchy(hiera_config_file)
-          ) do |source|
-            # search for data overrides in the global_hiera_params directory
-            yamlfile = File.join(data_dir, dir, "#{source}.yaml")
-            if File.exists?(yamlfile)
-              config = YAML.load_file(yamlfile)
-              config.each do |k, v|
-                data[k] ||= v
-              end
-            end
-          end 
+        begin
+          require 'hiera'
+        rescue
+          Puppet.Warning("Hiera libraries could not be loaded")
+          return {}
         end
+        # get the hiera config file
+        hiera_config_file  = File.join(Puppet[:confdir], 'hiera.yaml')
+        data = {}
+        # iterate through all data sources from this config file
+        Hiera::Backend.datasources(
+          scope,
+          nil,
+          get_hierarchy(hiera_config_file)
+        ) do |source|
+          # search for data overrides in the global_hiera_params directory
+          yamlfile = File.join(data_dir, dir, "#{source}.yaml")
+          Puppet.debug("Searching #{yamlfile} for keys")
+          if File.exists?(yamlfile)
+            config = YAML.load_file(yamlfile)
+            config.each do |k, v|
+              data[k] ||= v
+            end
+          end
+        end 
         data
       end
 
@@ -203,6 +217,7 @@ module Puppet
       def get_hierarchy(file)
         default_hierarchy = ["scenario/%{scenario}", 'common']
         if File.exists?(file)
+puts  (YAML.load_file(file) || {})[:hierarchy]
           (YAML.load_file(file) || {})[:hierarchy] || default_hierarchy
         else
           default_hierarchy
