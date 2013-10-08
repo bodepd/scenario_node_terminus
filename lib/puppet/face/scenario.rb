@@ -3,7 +3,7 @@ require 'puppet/bodepd/scenario_helper'
 
 include Puppet::Bodepd::ScenarioHelper
 Puppet::Face.define(:scenario, '0.0.1') do
-  action :compile do
+  action :compile_role do
 
 
     summary "Compile an entire role for a specific scenario."

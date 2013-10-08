@@ -34,3 +34,25 @@ Contains a list of classes available in each class group
 * role_mappings.yaml
 
 Contains a list of hostnames that the roles that they should be suppied.
+
+# command line tools
+
+This module also comes with a collection of tools that can be used for debugging:
+
+All of these utilities are implemented as a Puppet Face. To see the available commands, run:
+
+    puppet help scenario
+
+or to learn about an individual commadn:
+
+    puppet help scenerio get_classes
+
+It currently supports two commands:
+
+To retrieve the list of classes that are associated with a role:
+
+    puppet scenario get_clases <ROLE_NAME> --render-as yaml
+
+To retrieve the list of classes together with their specified data:
+
+    puppet scenario compile_role <ROLE_NAME> --render-as yaml

@@ -40,15 +40,43 @@ module Puppet
         get_classes_per_scenario(global_config, role)
       end
 
+      # given a role, figure out what classes are included, and 
+      # what parameters are set to what values for those classes
       def compile_everything(role)
         global_config = get_global_config
         class_list = get_classes_per_scenario(global_config, role)
+        class_hash = {}
+        class_list.each do |x|
+          class_hash[x] = {}
+        end
 
         # get all keys from data_mappings
-        data_mappings = get_keys_per_dir('data_mappings', global_config)
+        data_mappings = get_keys_per_dir('data_mappings', global_config, true)
 
-        puts data_mappings.to_yaml
-        get_keys_per_dir('hiera_data', global_config)
+        # get hiera data
+        hiera_data    = get_keys_per_dir('hiera_data',    global_config)
+
+        # resolve hiera lookups 
+        lookedup_data = {}
+        data_mappings.each do |k,v|
+          lookedup_data[k] = hiera_data[v] || interpolate_string(
+                                                v,
+                                                global_config.merge(hiera_data)
+                                              )
+        end
+
+        lookups = hiera_data.merge(lookedup_data)
+        lookup_without_globals= {}
+        lookups.each do |k,v|
+          k_a = k.split('::')
+          if k_a.size > 1
+            klass_name = k_a[0..-2].join('::')
+            if class_hash[klass_name]
+              class_hash[klass_name][k] = v
+            end
+          end
+        end
+        class_hash
 
       end
 
@@ -62,16 +90,6 @@ module Puppet
           []
         end
       end
-
-
-      # return a list of all class parameters from the hierarcy
-      # based on the global variables that we currently know about
-      def get_all_class_params(global_config)
-
-        # given this set of globals, I need to figure out the merge hierarchy
-
-      end
-
 
       # get Puppet's confdir
       def confdir
@@ -180,7 +198,7 @@ module Puppet
       # take a hiera config file,diretory and scope
       # and use it to retrieve all valid keys in hiera
       #
-      def get_keys_per_dir(dir, scope={})
+      def get_keys_per_dir(dir, scope={}, is_data_mapping=false)
         begin
           require 'hiera'
         rescue
@@ -202,7 +220,14 @@ module Puppet
           if File.exists?(yamlfile)
             config = YAML.load_file(yamlfile)
             config.each do |k, v|
-              data[k] ||= v
+              if is_data_mapping
+                v = Array(v)
+                v.each do |x|
+                  data[x] = k
+                end
+              else
+                data[k] ||= v
+              end
             end
           end
         end 
@@ -217,7 +242,6 @@ module Puppet
       def get_hierarchy(file)
         default_hierarchy = ["scenario/%{scenario}", 'common']
         if File.exists?(file)
-puts  (YAML.load_file(file) || {})[:hierarchy]
           (YAML.load_file(file) || {})[:hierarchy] || default_hierarchy
         else
           default_hierarchy
