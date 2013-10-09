@@ -11,6 +11,10 @@ Puppet::Face.define(:scenario, '0.0.1') do
       default_to { Puppet[:certname] }
     end
 
+    option '--interpolate_hiera_data' do
+      summary 'Tells hiera to interpolate its data'
+    end
+
     summary "Compile an entire role for a specific scenario."
 
     arguments "role"
@@ -28,7 +32,7 @@ Puppet::Face.define(:scenario, '0.0.1') do
     EOT
 
     when_invoked do |role, options|
-      compile_everything(role, options[:certname_for_facts])
+      compile_everything(role, options)
     end
 
   end

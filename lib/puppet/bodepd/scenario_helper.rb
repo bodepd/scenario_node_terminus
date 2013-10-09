@@ -35,7 +35,8 @@ module Puppet
       end
 
       # returns a list of all classes assocated with a role
-      def get_classes_from_role(role, certname)
+      def get_classes_from_role(role, options)
+        certname      = options[:certname_for_facts]
         global_config = get_global_config
         global_cofig  = find_facts(certname).merge(global_config)
         get_classes_per_scenario(global_config, role)
@@ -43,7 +44,8 @@ module Puppet
 
       # given a role, figure out what classes are included, and
       # what parameters are set to what values for those classes
-      def compile_everything(role, certname)
+      def compile_everything(role, options)
+        certname      = options[:certname_for_facts]
         global_config = find_facts(certname).merge(get_global_config)
         class_list = get_classes_per_scenario(global_config, role)
         class_hash = {}
@@ -55,7 +57,12 @@ module Puppet
         data_mappings = get_keys_per_dir('data_mappings', global_config, true)
 
         # get hiera data
-        hiera_data    = get_keys_per_dir('hiera_data',    global_config)
+        hiera_data    = get_keys_per_dir(
+                          'hiera_data',
+                          global_config,
+                          false,
+                          options[:interpolate_hiera_data]
+                        )
 
         # resolve hiera lookups
         lookedup_data = {}
@@ -189,7 +196,7 @@ module Puppet
       # take a hiera config file,diretory and scope
       # and use it to retrieve all valid keys in hiera
       #
-      def get_keys_per_dir(dir, scope={}, is_data_mapping=false)
+      def get_keys_per_dir(dir, scope={}, is_data_mapping=false, interpolate_hiera_data=true)
         begin
           require 'hiera'
         rescue
@@ -217,7 +224,10 @@ module Puppet
                   data[x] = k
                 end
               else
-                data[k] ||= interpolate_string(v, scope)
+                data[k] ||= \
+                  ((interpolate_hiera_data &&
+                  interpolate_string(v, scope)) ||
+                  v)
               end
             end
           end
