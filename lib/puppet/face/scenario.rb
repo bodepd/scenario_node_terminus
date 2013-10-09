@@ -23,7 +23,7 @@ Puppet::Face.define(:scenario, '0.0.1') do
     EOT
 
     when_invoked do |role, options|
-      compile_everything(role)
+      compile_everything(role, Puppet[:certname])
     end
 
   end

@@ -43,8 +43,8 @@ module Puppet
 
       # given a role, figure out what classes are included, and
       # what parameters are set to what values for those classes
-      def compile_everything(role)
-        global_config = find_facts.merge(get_global_config)
+      def compile_everything(role, certname)
+        global_config = find_facts(certname).merge(get_global_config)
         class_list = get_classes_per_scenario(global_config, role)
         class_hash = {}
         class_list.each do |x|
