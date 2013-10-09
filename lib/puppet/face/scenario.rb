@@ -8,7 +8,7 @@ Puppet::Face.define(:scenario, '0.0.1') do
 
     option '--certname_for_facts CERTNAME' do
       summary 'The certname to use to retrieve facts used to compile hierarchies'
-      defaultto Puppet[:certname]
+      default_to { Puppet[:certname] }
     end
 
     summary "Compile an entire role for a specific scenario."
