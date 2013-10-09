@@ -56,7 +56,7 @@ module Puppet
         # get hiera data
         hiera_data    = get_keys_per_dir('hiera_data',    global_config)
 
-        # resolve hiera lookups 
+        # resolve hiera lookups
         lookedup_data = {}
         data_mappings.each do |k,v|
           lookedup_data[k] = hiera_data[v] || interpolate_string(
@@ -91,24 +91,20 @@ module Puppet
         end
       end
 
-      # get Puppet's confdir
-      def confdir
-        Puppet[:confdir]
-      end
-
-      # get the datadir
-      def data_dir
-        @data_dir ||= File.join(Puppet[:confdir], 'data')
-      end
 
       # load the global config from $confdir/data/config.yaml
       # and verify that it specifies a scenario
       def get_global_config
         # load the global configuration data
         global_config = {}
-        global_config_file = File.join(data_dir, 'config.yaml')
+        global_config_file = get_data_file(data_dir, 'config.yaml')
         if File.exists?(global_config_file)
           global_config = YAML.load_file(global_config_file)
+        else
+          raise(Exception, 'config.yaml must exist')
+        end
+        if ! global_config || ! global_config['scenario']
+          raise(Exception, 'scenario must be defined in config.yaml')
         end
         overrides = get_global_hiera_data({'scenario' => global_config["scenario"]})
         global_config.merge(overrides)
@@ -127,7 +123,7 @@ module Puppet
 
       # load a scenario's YAML
       def get_scenario_data(name)
-        scenario_file = File.join(data_dir, 'scenarios', "#{name}.yaml")
+        scenario_file = get_data_file(File.join(data_dir, 'scenarios'), "#{name}.yaml")
         unless File.exists?(scenario_file)
           raise(Exception, "scenario file #{scenario_file} does not exist")
         end
@@ -138,12 +134,12 @@ module Puppet
 
       # I may need to be clever enough to try to find dep loops
       # or not even allow class groups to contain class groups
-      def get_classes_from_groups(group_names, scope)
+      def get_classes_from_groups(group_names, scope={})
         # expect that each group file
         if group_names
           group_dir = File.join(data_dir, 'class_groups')
           group_names.reduce([]) do |result, name|
-            group_file = File.join(group_dir, "#{name}.yaml")
+            group_file = get_data_file(group_dir, "#{name}.yaml")
             unless File.exists?(group_file)
               raise(Exception, "Group file #{group_file} does not exist")
             end
@@ -153,22 +149,16 @@ module Puppet
             get_classes_from_groups(
               (class_group['class_groups'] || []).map{|x| interpolate_string(x, scope)}, scope
             )
-          end
+          end.uniq
         else
           []
         end
       end
 
-      def interpolate_string(string, scope)
-        string.gsub(/%\{([^\}]*)\}/) do
-          name = $1
-          scope[$1] || raise(Exception, "Interpolation for #{name} failed")
-        end
-      end
 
       # given the name of a node, figure out its role
       def get_role(name)
-        role_mapper = File.join(data_dir, 'role_mappings.yaml')
+        role_mapper = get_data_file(data_dir, 'role_mappings.yaml')
         unless File.exists?(role_mapper)
           raise(Exception, "Role mapping file: #{role_mapper} should exist")
         end
@@ -215,7 +205,7 @@ module Puppet
           get_hierarchy(hiera_config_file)
         ) do |source|
           # search for data overrides in the global_hiera_params directory
-          yamlfile = File.join(data_dir, dir, "#{source}.yaml")
+          yamlfile = get_data_file(File.join(data_dir, dir), "#{source}.yaml")
           Puppet.debug("Searching #{yamlfile} for keys")
           if File.exists?(yamlfile)
             config = YAML.load_file(yamlfile)
@@ -226,11 +216,11 @@ module Puppet
                   data[x] = k
                 end
               else
-                data[k] ||= v
+                data[k] ||= interpolate_string(v, scope)
               end
             end
           end
-        end 
+        end
         data
       end
 
@@ -248,8 +238,35 @@ module Puppet
         end
       end
 
+      # get Puppet's confdir
+      def confdir
+        Puppet[:confdir]
+      end
+
+      # get the datadir
+      def data_dir
+        @data_dir ||= File.join(Puppet[:confdir], 'data')
+      end
+
+      def interpolate_string(string, scope)
+        if string.is_a?(String)
+          string.gsub(/%\{([^\}]*)\}/) do
+            scope[$1] || raise(Exception, "Interpolation for #{$1} failed")
+          end
+        else
+          string
+        end
+      end
+
+      private
+
+        # This method is just here to make testing easier.
+        # this way, I can just stub out this method and return
+        # a tmpfile for testing purposes
+        def get_data_file(dir, file_name)
+          File.join(dir, file_name)
+        end
+
     end
-
   end
-
 end
