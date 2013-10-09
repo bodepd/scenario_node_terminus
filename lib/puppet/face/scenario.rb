@@ -6,6 +6,11 @@ Puppet::Face.define(:scenario, '0.0.1') do
   action :compile_role do
 
 
+    option '--certname_for_facts CERTNAME' do
+      summary 'The certname to use to retrieve facts used to compile hierarchies'
+      defaultto Puppet[:certname]
+    end
+
     summary "Compile an entire role for a specific scenario."
 
     arguments "role"
@@ -23,7 +28,7 @@ Puppet::Face.define(:scenario, '0.0.1') do
     EOT
 
     when_invoked do |role, options|
-      compile_everything(role, Puppet[:certname])
+      compile_everything(role, options[:certname_for_facts])
     end
 
   end
@@ -43,7 +48,7 @@ Puppet::Face.define(:scenario, '0.0.1') do
     EOT
 
     when_invoked do |role, options|
-      get_classes_from_role(role, Puppet[:certname])
+      get_classes_from_role(role, options[:certname_for_facts])
     end
 
   end
