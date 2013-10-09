@@ -35,15 +35,16 @@ module Puppet
       end
 
       # returns a list of all classes assocated with a role
-      def get_classes_from_role(role)
+      def get_classes_from_role(role, certname)
         global_config = get_global_config
+        global_cofig  = find_facts(certname).merge(global_config)
         get_classes_per_scenario(global_config, role)
       end
 
-      # given a role, figure out what classes are included, and 
+      # given a role, figure out what classes are included, and
       # what parameters are set to what values for those classes
       def compile_everything(role)
-        global_config = get_global_config
+        global_config = find_facts.merge(get_global_config)
         class_list = get_classes_per_scenario(global_config, role)
         class_hash = {}
         class_list.each do |x|
@@ -255,6 +256,17 @@ module Puppet
           end
         else
           string
+        end
+      end
+
+      def find_facts(certname)
+        Puppet.info("Finding facts for host: #{certname} using terminus: #{Puppet[:facts_terminus]}")
+        if facts = Puppet::Face[:facts, :current].find(certname)
+          Puppet.debug(facts.to_yaml)
+          facts.values
+        else
+          Puppet.warning("No facts found for: #{certname}")
+          {}
         end
       end
 

@@ -16,6 +16,10 @@ Puppet::Face.define(:scenario, '0.0.1') do
 
     description <<-'EOT'
       Compiles the complete scenario
+
+      If the hierarchy to get those classes requires facts, you
+      may have to set the internal Puppet options of facts_terminus
+      and certname in order to get the correct facts for testing.
     EOT
 
     when_invoked do |role, options|
@@ -28,14 +32,18 @@ Puppet::Face.define(:scenario, '0.0.1') do
 
     summary 'Get all classes from the provided data directory and role'
 
-    arguments "role"
+    arguments 'role'
 
     description <<-'EOT'
-      Given the provided data, get the full list of classes
+      Given the provided data, get the full list of classes.
+
+      If the hierarchy to get those classes requires facts, you
+      may have to set the internal Puppet options of facts_terminus
+      and certname in order to get the correct facts for testing.
     EOT
 
     when_invoked do |role, options|
-      get_classes_from_role(role)
+      get_classes_from_role(role, Puppet[:certname])
     end
 
   end
