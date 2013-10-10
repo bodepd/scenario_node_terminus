@@ -25,7 +25,7 @@ module Puppet
         global_config['role'] = role
 
         # get classes from scenario and role
-        node.classes = get_classes_per_scenario(global_config, role)
+        node.classes = get_classes_per_scenario(global_config, role) || []
 
         # merge facts into the node
         node.fact_merge
