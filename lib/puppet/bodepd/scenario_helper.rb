@@ -37,6 +37,8 @@ module Puppet
       def get_hiera_data_from_key(key, options)
         certname      = options[:certname_for_facts]
         global_config = get_global_config
+        Puppet.info("Finding our nodes facts and merging them with global dat;
+")
         global_cofig  = find_facts(certname).merge(global_config)
         data_mapping  = lookup_data_mapping(key, global_config)
         hiera_data    = lookup_hiera_data(data_mapping || key, global_config)
@@ -126,6 +128,8 @@ module Puppet
         if ! global_config || ! global_config['scenario']
           raise(Exception, 'scenario must be defined in config.yaml')
         end
+        Puppet.info("Found scenario: #{global_config['scenario']} in #{global_config_file}")
+        Puppet.info("Using scenario to help determine hiera globals")
         overrides = get_global_hiera_data({'scenario' => global_config["scenario"]})
         global_config.merge(overrides)
       end
@@ -201,7 +205,9 @@ module Puppet
       # get all keys and their values for all global hiera config
       #
       def get_global_hiera_data(scope)
-        compile_hiera_data(scope, 'global_hiera_params')
+        global_data = compile_hiera_data(scope, 'global_hiera_params')
+        Puppet.debug("Found global data: #{global_data.inspect}")
+        global_data
       end
 
       #
