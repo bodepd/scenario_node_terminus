@@ -77,12 +77,9 @@ module Puppet
         lookedup_data = {}
         data_mappings.each do |k,v|
           if hiera_data[v] == nil
-            # I saw an example where this did not work
-            # the value became the value of the key
             if v =~ /%\{([^\}]*)\}/
               lookedup_data[k] = interpolate_string(v, global_config.merge(hiera_data))
             else
-              # we should possibley only be failing if it is relevant to the role?
               if class_hash[get_namespace(v)]
                 raise(Exception, "data mapping #{v} not found in hiera data")
               end
@@ -257,7 +254,7 @@ module Puppet
           v.each do |x|
             if x == key
               Puppet.info("Found key: '#{k}' matching: '#{x}'")
-              Puppet.info("We will not stop traversing the data_mappings hierarchy")
+              Puppet.info("We will now stop traversing the data_mappings hierarchy")
               Puppet.info("Now, we will look up this key in the hiera_data")
               return k
             end
@@ -273,6 +270,7 @@ module Puppet
         get_keys_per_dir(scope, 'hiera_data') do |k, v, data|
           if k == key
             Puppet.info("Found key in hiera with value: #{v}")
+            Puppet.info("We will not stop traversing hiera_data")
             if v =~ /%\{([^\}]*)\}/
               Puppet.info("Interpolating value from globals and facts")
               return interpolate_string(v, scope)
