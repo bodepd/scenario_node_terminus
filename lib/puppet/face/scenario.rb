@@ -57,4 +57,21 @@ Puppet::Face.define(:scenario, '0.0.1') do
 
   end
 
+  action :get_hiera_data do
+
+    summary 'get the current value of a piece of data'
+
+    arguments 'key'
+    
+    option '--certname_for_facts CERTNAME' do
+      summary 'The certname to use to retrieve facts used to compile hierarchies'
+      default_to { Puppet[:certname] }
+    end
+
+    when_invoked do |key, options|
+      get_hiera_data_from_key(key, options)
+    end
+
+  end
+
 end

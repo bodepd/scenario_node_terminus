@@ -34,6 +34,16 @@ module Puppet
         node
       end
 
+      def get_hiera_data_from_key(key, options)
+        certname      = options[:certname_for_facts]
+        global_config = get_global_config
+        global_cofig  = find_facts(certname).merge(global_config)
+        data_mapping  = lookup_data_mapping(key, global_config)
+        hiera_data    = lookup_hiera_data(data_mapping || key, global_config)
+        Puppet.info("Found value: '#{hiera_data}'")
+        hiera_data
+      end
+
       # returns a list of all classes assocated with a role
       def get_classes_from_role(role, options)
         certname      = options[:certname_for_facts]
@@ -54,34 +64,40 @@ module Puppet
         end
 
         # get all keys from data_mappings
-        data_mappings = get_keys_per_dir('data_mappings', global_config, true)
+        data_mappings = compile_data_mappings(global_config)
 
         # get hiera data
-        hiera_data    = get_keys_per_dir(
-                          'hiera_data',
+        hiera_data    = compile_hiera_data(
                           global_config,
-                          false,
+                          'hiera_data',
                           options[:interpolate_hiera_data]
                         )
 
         # resolve hiera lookups
         lookedup_data = {}
         data_mappings.each do |k,v|
-          lookedup_data[k] = hiera_data[v] || interpolate_string(
-                                                v,
-                                                global_config.merge(hiera_data)
-                                              )
+          if hiera_data[v] == nil
+            # I saw an example where this did not work
+            # the value became the value of the key
+            if v =~ /%\{([^\}]*)\}/
+              lookedup_data[k] = interpolate_string(v, global_config.merge(hiera_data))
+            else
+              # we should possibley only be failing if it is relevant to the role?
+              if class_hash[get_namespace(v)]
+                raise(Exception, "data mapping #{v} not found in hiera data")
+              end
+            end
+          else
+            lookedup_data[k] = hiera_data[v]
+          end
         end
 
         lookups = hiera_data.merge(lookedup_data)
         lookup_without_globals= {}
         lookups.each do |k,v|
-          k_a = k.split('::')
-          if k_a.size > 1
-            klass_name = k_a[0..-2].join('::')
-            if class_hash[klass_name]
-              class_hash[klass_name][k] = v
-            end
+          klass_name = get_namespace(k)
+          if class_hash[klass_name]
+            class_hash[klass_name][k] = v
           end
         end
         class_hash
@@ -98,7 +114,6 @@ module Puppet
           []
         end
       end
-
 
       # load the global config from $confdir/data/config.yaml
       # and verify that it specifies a scenario
@@ -189,14 +204,14 @@ module Puppet
       # get all keys and their values for all global hiera config
       #
       def get_global_hiera_data(scope)
-        get_keys_per_dir('global_hiera_params', scope)
+        compile_hiera_data(scope, 'global_hiera_params')
       end
 
       #
       # take a hiera config file,diretory and scope
       # and use it to retrieve all valid keys in hiera
       #
-      def get_keys_per_dir(dir, scope={}, is_data_mapping=false, interpolate_hiera_data=true)
+      def get_keys_per_dir(scope, dir)
         begin
           require 'hiera'
         rescue
@@ -218,21 +233,65 @@ module Puppet
           if File.exists?(yamlfile)
             config = YAML.load_file(yamlfile)
             config.each do |k, v|
-              if is_data_mapping
-                v = Array(v)
-                v.each do |x|
-                  data[x] = k
-                end
-              else
-                data[k] ||= \
-                  ((interpolate_hiera_data &&
-                  interpolate_string(v, scope)) ||
-                  v)
-              end
+              data = yield(k,v,data)
             end
           end
         end
         data
+      end
+
+      def compile_data_mappings(scope ={})
+        get_keys_per_dir(scope, 'data_mappings') do |k, v, data|
+          v = Array(v)
+          v.each do |x|
+            data[x] ||= k
+          end
+          data
+        end
+      end
+
+      def lookup_data_mapping(key, scope={})
+        Puppet.info("Looking for hiera key: #{key} in data mappings")
+        get_keys_per_dir(scope, 'data_mappings') do |k, v, data|
+          v = Array(v)
+          v.each do |x|
+            if x == key
+              Puppet.info("Found key: '#{k}' matching: '#{x}'")
+              Puppet.info("We will not stop traversing the data_mappings hierarchy")
+              Puppet.info("Now, we will look up this key in the hiera_data")
+              return k
+            end
+            puts x if x =~ /#{key}/
+          end
+        end
+        Puppet.info("Did not find anything matching parameter: #{key}")
+        return nil
+      end
+
+      def lookup_hiera_data(key, scope={})
+        Puppet.info("Looking for hiera key: #{key}")
+        get_keys_per_dir(scope, 'hiera_data') do |k, v, data|
+          if k == key
+            Puppet.info("Found key in hiera with value: #{v}")
+            if v =~ /%\{([^\}]*)\}/
+              Puppet.info("Interpolating value from globals and facts")
+              return interpolate_string(v, scope)
+            else
+              return v
+            end
+          end
+        end
+      end
+
+      def compile_hiera_data(scope ={}, dir='hiera_data', interpolate_hiera_data=true)
+        get_keys_per_dir(scope, dir) do |k, v, data|
+          data[k] ||= \
+                    ((interpolate_hiera_data &&
+                     interpolate_string(v, scope)) ||
+                     v
+                    ) 
+          data
+        end
       end
 
       #
@@ -287,6 +346,16 @@ module Puppet
         # a tmpfile for testing purposes
         def get_data_file(dir, file_name)
           File.join(dir, file_name)
+        end
+
+        def get_namespace(param)
+          param_a = param.split('::')
+          if param_a.size > 1
+            return param_a[0..-2].join('::')
+          else
+            ''
+            #raise("Param: #{param} has no namespace")
+          end
         end
 
     end
