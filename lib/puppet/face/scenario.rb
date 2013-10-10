@@ -52,7 +52,7 @@ Puppet::Face.define(:scenario, '0.0.1') do
     EOT
 
     when_invoked do |role, options|
-      get_classes_from_role(role, options[:certname_for_facts])
+      get_classes_from_role(role, options)
     end
 
   end
