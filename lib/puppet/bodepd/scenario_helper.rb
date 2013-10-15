@@ -46,18 +46,18 @@ module Puppet
         global_config = get_global_config
         Puppet.info("Finding our node's facts and merging them with global data
 ")
-        global_cofig  = find_facts(certname).merge(global_config)
-        data_mapping  = lookup_data_mapping(key, global_config)
-        hiera_data    = lookup_hiera_data(data_mapping || key, global_config)
+        global_config  = find_facts(certname).merge(global_config)
+        data_mapping   = lookup_data_mapping(key, global_config)
+        hiera_data     = lookup_hiera_data(data_mapping || key, global_config)
         Puppet.info("Found value: '#{hiera_data}'")
         hiera_data
       end
 
       # returns a list of all classes associated with a role
       def get_classes_from_role(role, options)
-        certname      = options[:certname_for_facts]
-        global_config = get_global_config
-        global_cofig  = find_facts(certname).merge(global_config)
+        certname       = options[:certname_for_facts]
+        global_config  = get_global_config
+        global_config  = find_facts(certname).merge(global_config)
         get_classes_per_scenario(global_config, role)
       end
 
