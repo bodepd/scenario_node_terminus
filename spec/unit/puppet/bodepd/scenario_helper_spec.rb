@@ -12,38 +12,79 @@ describe 'scenerio helper methods' do
     ).with(dir, "#{name}.yaml").returns(file_path)
   end
 
+  # stubs class_groups
   def class_group_file_stubber(name, file_path)
     data_file_stubber(name, file_path, '/etc/puppet/data/class_groups')
   end
 
-  def scenario_file_stubber(file_name)
+  # stubs config.yaml
+  def config_file_stubber(file_name)
     data_file_stubber('config', file_name, '/etc/puppet/data')
   end
 
+  # stubs global_hiera_params
   def global_file_stubber(global_name, file_name)
     data_file_stubber(global_name, file_name, '/etc/puppet/data/global_hiera_params')
   end
 
-  def setup_scenario_test_data
-    @scenario = tmp_file(<<-EOT
+  def scenario_file_stubber(name, tmp_file)
+    data_file_stubber(name, tmp_file, '/etc/puppet/data/scenarios')
+  end
+
+  def role_mapper_file_stubber(tmp_file_name)
+    data_file_stubber('role_mappings', tmp_file_name, '/etc/puppet/data')
+  end
+
+  # sets up config.yaml
+  def setup_config_test_data
+    @config = tmp_file(<<-EOT
 scenario: scenario_name
 EOT
     )
-    scenario_file_stubber(@scenario)
+    config_file_stubber(@config)
   end
 
+  # sets up global config
   def setup_global_test_data
     @global_common = tmp_file(<<-EOT
 foo: bar
+bar: blah
 EOT
     )
     @global_scenario = tmp_file(<<-EOT
 foo: baz
+four: value
 blah: "%{scenario}"
 EOT
     )
     global_file_stubber('common', @global_common)
     global_file_stubber('scenario/scenario_name', @global_scenario)
+  end
+
+  def setup_node_role_mapping
+    @roles = tmp_file(<<-EOT
+node1: role1
+node2: role2
+EOT
+    )
+    role_mapper_file_stubber(@roles)
+  end
+
+  def setup_scenario_test_data
+    @scenario = tmp_file(<<-EOT
+roles:
+  role1:
+    classes:
+      - one
+    class_groups:
+      - bar
+      - foo
+  role2:
+    classes:
+      - "%{foo}"
+EOT
+    )
+    scenario_file_stubber('scenario_name' ,@scenario)
   end
 
   # used to setup some class groups that can be used
@@ -78,7 +119,6 @@ EOT
     class_group_file_stubber('bar', @class_group_bar)
     class_group_file_stubber('baz', @class_group_baz)
     class_group_file_stubber('blah', @class_group_blah)
-
   end
 
   before do
@@ -88,7 +128,42 @@ EOT
 
   describe 'when getting node from name' do
 
-    it 'should be able to return the class list and set global variables for the node'
+    describe 'when role_mapping is valid' do
+      before do
+        setup_config_test_data
+        setup_global_test_data
+        setup_scenario_test_data
+        setup_class_group_test_data
+        setup_node_role_mapping
+      end
+      it 'should return class list and globals' do
+        node1 = get_node_from_name('node1')
+        node1[:classes].sort.should == ['five', 'one', 'three', 'two', 'value']
+        params = node1[:parameters]
+        params['role'].should     == 'role1'
+        params['blah'].should     == 'scenario_name'
+        params['foo'].should      == 'baz'
+        params['four'].should     == 'value'
+        params['scenario'].should == 'scenario_name'
+        params['bar'].should      == 'blah'
+      end
+      it 'should be able to interpolate inline classes' do
+        node2 = get_node_from_name('node2')
+        node2[:classes].include?('baz').should be_true
+      end
+      it 'should support interpolation of class groups'
+      it 'should not return classes for nodes without roles' do
+        node3 = get_node_from_name('node3')
+        params = node3[:parameters]
+        node3[:classes].should == []
+        params['role'].should be_nil
+        params['blah'].should     == 'scenario_name'
+        params['foo'].should      == 'baz'
+        params['four'].should     == 'value'
+        params['scenario'].should == 'scenario_name'
+        params['bar'].should      == 'blah'
+      end
+    end
 
   end
 
@@ -123,7 +198,7 @@ EOT
       end.to raise_error(Exception, /scenario must be defined in config\.yaml/)
     end
     it 'should load global settings' do
-      setup_scenario_test_data
+      setup_config_test_data
       setup_global_test_data
       self.expects('get_hierarchy').with('/etc/puppet/hiera.yaml').returns(["scenario/%{scenario}", 'common'])
       config = get_global_config
@@ -131,14 +206,6 @@ EOT
       config['blah'].should     == 'scenario_name'
       config['scenario'].should == 'scenario_name'
     end
-
-  end
-
-  describe 'when getting role classes from a scenario' do
-
-    it 'should be able to compile all classes for all roles'
-
-    it 'should fail if the role file does not exist'
 
   end
 

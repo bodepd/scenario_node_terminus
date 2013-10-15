@@ -44,6 +44,11 @@ This file maps nodes to the roles that they should be assigned.
   include Puppet::Bodepd::ScenarioHelper
 
   def find(request)
-    get_node_from_name(request.key)
+    classification_info = get_node_from_name(request.key)
+    node = Puppet::Node.new(request.key)
+    node.parameters = classification_info[:parameters]
+    node.classes    = classification_info[:classes]
+    node.fact_merge
+    node
   end
 end

@@ -10,34 +10,41 @@ module Puppet
   module Bodepd
     module ScenarioHelper
 
+      #
+      # returns a hash of parameters
+      # and list of classes for a given node_name
+      #
       def get_node_from_name(node_name)
-
-        node = Puppet::Node.new(node_name)
 
         Puppet.debug("Looking up classes for #{node_name}")
 
+        classification_info = {}
+
         # get the global configuration
         global_config = get_global_config
-        node.parameters = global_config
+        classification_info[:parameters] = global_config
 
         # get classes from roles
         role                  = get_role(node_name)
         global_config['role'] = role
 
         # get classes from scenario and role
-        node.classes = get_classes_per_scenario(global_config, role) || []
+        classification_info[:classes] = \
+          (get_classes_per_scenario(global_config, role) || []).uniq
 
-        # merge facts into the node
-        node.fact_merge
+        classification_info
 
-        # pass the node back to Puppet
-        node
       end
 
+      #
+      # get an individual hiera data value
+      # given the currently available data and
+      # a class parameter name
+      #
       def get_hiera_data_from_key(key, options)
         certname      = options[:certname_for_facts]
         global_config = get_global_config
-        Puppet.info("Finding our nodes facts and merging them with global dat;
+        Puppet.info("Finding our node's facts and merging them with global data
 ")
         global_cofig  = find_facts(certname).merge(global_config)
         data_mapping  = lookup_data_mapping(key, global_config)
@@ -46,7 +53,7 @@ module Puppet
         hiera_data
       end
 
-      # returns a list of all classes assocated with a role
+      # returns a list of all classes associated with a role
       def get_classes_from_role(role, options)
         certname      = options[:certname_for_facts]
         global_config = get_global_config
@@ -59,8 +66,9 @@ module Puppet
       def compile_everything(role, options)
         certname      = options[:certname_for_facts]
         global_config = find_facts(certname).merge(get_global_config)
-        class_list = get_classes_per_scenario(global_config, role)
-        class_hash = {}
+        class_list    = get_classes_per_scenario(global_config, role)
+        class_hash    = {}
+
         class_list.each do |x|
           class_hash[x] = {}
         end
@@ -78,6 +86,7 @@ module Puppet
         # resolve hiera lookups
         lookedup_data = {}
         data_mappings.each do |k,v|
+          # specifically check for nil so we don't drop false values
           if hiera_data[v] == nil
             if v =~ /%\{([^\}]*)\}/
               lookedup_data[k] = interpolate_string(v, global_config.merge(hiera_data))
@@ -140,7 +149,7 @@ module Puppet
         role_classes = {}
         # iterate through each roles in a scenario
         get_scenario_data(name)['roles'].each do |role_name, values|
-          role_classes[role_name] = (values['classes'] || []) + get_classes_from_groups(values['class_groups'], scope)
+          role_classes[role_name] = process_classes(values, scope)
         end
         role_classes
       end
@@ -168,17 +177,23 @@ module Puppet
               raise(Exception, "Group file #{group_file} does not exist")
             end
             class_group = YAML.load_file(group_file)
-            result +
-            (class_group['classes'] || []).map{|x| interpolate_string(x, scope)} +
-            get_classes_from_groups(
-              (class_group['class_groups'] || []).map{|x| interpolate_string(x, scope)}, scope
-            )
+            result + process_classes(class_group, scope)
           end.uniq
         else
           []
         end
       end
 
+      #
+      # processes classes and class_groups down to
+      # a list of classes
+      #
+      def process_classes(klass_hash, scope)
+        interpolate_array(klass_hash['classes'], scope) +
+        get_classes_from_groups(
+          interpolate_array(klass_hash['class_groups'], scope), scope
+        )
+      end
 
       # given the name of a node, figure out its role
       def get_role(name)
@@ -293,7 +308,7 @@ module Puppet
                     ((interpolate_hiera_data &&
                      interpolate_string(v, scope)) ||
                      v
-                    ) 
+                    )
           data
         end
       end
@@ -330,6 +345,10 @@ module Puppet
         else
           string
         end
+      end
+
+      def interpolate_array(a, scope={})
+        (a || []).map {|x| interpolate_string(x, scope)}
       end
 
       def find_facts(certname)
