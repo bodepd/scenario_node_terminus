@@ -1,7 +1,10 @@
 require 'puppet/indirector/yaml'
 require 'puppet/node'
-require 'puppet/bodepd/scenario_helper'
 require 'yaml'
+require File.join(
+  File.dirname(__FILE__), '..', '..', '..',
+  'puppet/bodepd/scenario_helper.rb'
+)
 
 class Puppet::Node::Scenario < Puppet::Indirector::Yaml
   desc <<-EOT

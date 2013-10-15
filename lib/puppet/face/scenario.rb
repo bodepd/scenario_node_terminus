@@ -1,7 +1,9 @@
-require 'puppet/face'
-require 'puppet/bodepd/scenario_helper'
-
+require File.join(
+  File.dirname(__FILE__), '..', '..',
+  'puppet/bodepd/scenario_helper.rb'
+)
 include Puppet::Bodepd::ScenarioHelper
+
 Puppet::Face.define(:scenario, '0.0.1') do
   action :compile_role do
 
@@ -62,7 +64,7 @@ Puppet::Face.define(:scenario, '0.0.1') do
     summary 'get the current value of a piece of data'
 
     arguments 'key'
-    
+
     option '--certname_for_facts CERTNAME' do
       summary 'The certname to use to retrieve facts used to compile hierarchies'
       default_to { Puppet[:certname] }
