@@ -70,6 +70,29 @@ EOT
     data_mapper_file_stubber('scenario/scenario_name', @data_mapping_2)
   end
 
+  def setup_hiera_data
+    @hiera_data_1 = tmp_file(<<-EOT
+key: value
+overridable_key: default_value
+array:
+  - one
+hash
+  one: two
+EOT
+    )
+    @hiera_data_2 = tmp_file(<<-EOT
+interpolated: "%{foo}"
+overridable_key: overridden_value
+array:
+  - two
+hash:
+  three: four
+EOT
+    )
+    hiera_data_file_stubber('common', @hiera_data_1)
+    hiera_data_file_stubber('scenario/scenario_name', @hiera_data_2 )
+  end
+
   # sets up config.yaml
   def setup_config_test_data
     @config = tmp_file(<<-EOT
@@ -324,6 +347,46 @@ EOT
       it 'should return nil to indicate no match' do
         get_role('bar').should be_nil
       end
+    end
+  end
+
+  describe 'when compiling hiera data' do
+    before :each do
+      Puppet.stubs(:[]).with(:confdir).returns('/etc/puppet/')
+      # stub the expected hierarchy
+      self.expects('get_hierarchy').with('/etc/puppet/hiera.yaml').returns(["scenario/%{scenario}", 'common'])
+      # stub the expected files to be found
+      setup_hiera_data
+    end
+    it 'should support basic lookup' do
+      scope_hash = {'scenario' => 'scenario_name', 'foo' => 'blah'}
+      hiera_data = compile_hiera_data(scope_hash)
+      hiera_data['key'].should == 'value'
+    end
+    it 'should interpolate by default' do
+      scope_hash = {'scenario' => 'scenario_name', 'foo' => 'blah'}
+      hiera_data = compile_hiera_data(scope_hash)
+      hiera_data['interpolated'].should == 'blah'
+    end
+    it 'should support overrides' do
+      scope_hash = {'scenario' => 'scenario_name', 'foo' => 'blah'}
+      hiera_data = compile_hiera_data(scope_hash)
+      hiera_data['overridable_key'].should == 'overridden_value'
+    end
+    it 'should override entire arrays' do
+      scope_hash = {'scenario' => 'scenario_name', 'foo' => 'blah'}
+      hiera_data = compile_hiera_data(scope_hash)
+      hiera_data['array'].should == ['two']
+    end
+    it 'should override entire hashes' do
+      scope_hash = {'scenario' => 'scenario_name', 'foo' => 'blah'}
+      hiera_data = compile_hiera_data(scope_hash)
+      hiera_data['hash'].should == {'three' => 'four'}
+    end
+    it 'should not interpolate when interpolate_data is set to false' do
+      scope_hash = {'scenario' => 'scenario_name', 'foo' => 'blah'}
+      hiera_data = compile_hiera_data(scope_hash, 'hiera_data', false)
+      hiera_data['interpolated'].should == '%{foo}'
     end
   end
 
