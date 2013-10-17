@@ -121,7 +121,13 @@ module Puppet
         scenario = global_config['scenario']
         if scenario
           Puppet.debug("Loading roles for scenario: #{scenario}")
-          get_role_classes_from_scenario(scenario, global_config)[role]
+          classes = get_role_classes_from_scenario(scenario, global_config)[role]
+          unless classes
+            Puppet.warning("The role #{role} is not defined for scenario: #{scenario}")
+            []
+          else
+            classes
+          end
         else
           Puppet.debug("Did not find a scenario, no classification will occur")
           []
