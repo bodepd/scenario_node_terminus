@@ -100,6 +100,11 @@ module Puppet
           end
         end
 
+        #
+        # Currently, this is assuming that the data mappings
+        # have precedence over hiera lookups, this is probably
+        # backwards
+        #
         lookups = hiera_data.merge(lookedup_data)
         lookup_without_globals= {}
         lookups.each do |k,v|
@@ -226,8 +231,9 @@ module Puppet
       end
 
       #
-      # take a hiera config file,diretory and scope
-      # and use it to retrieve all valid keys in hiera
+      # given a scope and a base directory, scan
+      # through the hierarchy from hiera.yaml
+      # and return a list of all keys
       #
       def get_keys_per_dir(scope, dir)
         begin
@@ -337,6 +343,7 @@ module Puppet
         @data_dir ||= File.join(Puppet[:confdir], 'data')
       end
 
+      # performs hiera style interpolation on strings
       def interpolate_string(string, scope)
         if string.is_a?(String)
           string.gsub(/%\{([^\}]*)\}/) do
@@ -347,6 +354,7 @@ module Puppet
         end
       end
 
+      # allows for interpolation of each string in an array
       def interpolate_array(a, scope={})
         (a || []).map {|x| interpolate_string(x, scope)}
       end

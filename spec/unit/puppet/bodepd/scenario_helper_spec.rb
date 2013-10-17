@@ -7,6 +7,7 @@ describe 'scenerio helper methods' do
 
   # stubs the data file to a specific tmp file
   def data_file_stubber(name, file_path, dir)
+
     self.stubs(
       :get_data_file
     ).with(dir, "#{name}.yaml").returns(file_path)
@@ -33,6 +34,40 @@ describe 'scenerio helper methods' do
 
   def role_mapper_file_stubber(tmp_file_name)
     data_file_stubber('role_mappings', tmp_file_name, '/etc/puppet/data')
+  end
+
+  def hiera_data_file_stubber(name, tmp_file_name)
+    data_file_stubber(name, tmp_file_name, '/etc/puppet/data/hiera_data')
+  end
+
+  def data_mapper_file_stubber(name, tmp_file_name)
+    data_file_stubber(name, tmp_file_name, '/etc/puppet/data/data_mappings')
+  end
+
+  def setup_data_mappings
+    @data_mapping_1 = tmp_file(<<-EOT
+verbose:
+  - foo::verbose
+  - bar::verbose
+"interpolation_%{foo}":
+  - foo::somevar
+  - bar::somevar
+duder:
+  - var1
+  - var2
+EOT
+    )
+    @data_mapping_2 = tmp_file(<<-EOT
+verbose:
+  - foo::verbose
+  - blah::verbose
+debug:
+  - bar::verbose
+  - bar::somevar
+EOT
+    )
+    data_mapper_file_stubber('common', @data_mapping_1)
+    data_mapper_file_stubber('scenario/scenario_name', @data_mapping_2)
   end
 
   # sets up config.yaml
@@ -292,10 +327,34 @@ EOT
     end
   end
 
-  describe 'when compiling hiera directory' do
+  describe 'when compiling all data_mappings' do
 
-    it 'should support changing the directory'
-    it 'should return {} when hiera cannot be loaded'
+    before :each do
+      Puppet.stubs(:[]).with(:confdir).returns('/etc/puppet/')
+      # stub the expected hierarchy
+      self.expects('get_hierarchy').with('/etc/puppet/hiera.yaml').returns(["scenario/%{scenario}", 'common'])
+      # stub the expected files to be found
+      setup_data_mappings
+    end
+
+    it 'should support basic lookups' do
+      scope_hash = {'scenario' => 'scenario_name', 'foo' => 'blah'}
+      compiled_keys = compile_data_mappings(scope_hash)
+      compiled_keys['var1'].should == 'duder'
+      compiled_keys['var2'].should == 'duder'
+    end
+
+    it 'should support overrides' do
+      scope_hash = {'scenario' => 'scenario_name', 'foo' => 'blah'}
+      compiled_keys = compile_data_mappings(scope_hash)
+      compiled_keys['bar::verbose'].should == 'debug'
+    end
+
+    it 'should not yet perform interpolation' do
+      scope_hash = {'scenario' => 'scenario_name', 'foo' => 'blah'}
+      compiled_keys = compile_data_mappings(scope_hash)
+      compiled_keys['foo::somevar'].should == 'interpolation_%{foo}'
+    end
 
   end
 
