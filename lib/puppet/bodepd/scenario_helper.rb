@@ -117,6 +117,16 @@ module Puppet
 
       end
 
+      def get_scenario_name
+        get_global_config['scenario']
+      end
+
+      def get_all_roles
+        global_config = get_global_config
+        get_role_classes_from_scenario(
+          global_config['scenario'], global_config)
+      end
+
       def get_classes_per_scenario(global_config, role)
         scenario = global_config['scenario']
         if scenario

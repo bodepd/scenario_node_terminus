@@ -76,4 +76,24 @@ Puppet::Face.define(:scenario, '0.0.1') do
 
   end
 
+  action :get_scenario do
+
+    summary 'returns the name of the current scenario'
+
+    when_invoked do |options|
+      get_scenario_name
+    end
+
+  end
+
+  action :get_roles do
+
+    summary 'returns the list of roles for the currently configure scenario'
+
+    when_invoked do |options|
+      get_all_roles
+    end
+
+  end
+
 end
