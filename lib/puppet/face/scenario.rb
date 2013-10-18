@@ -96,4 +96,15 @@ Puppet::Face.define(:scenario, '0.0.1') do
 
   end
 
+  action :get_class_group do
+
+    summary 'return list of classes with their data bindings for a given class group.'
+
+    arguments 'class_group'
+
+    when_invoked do |class_group, options|
+      get_class_group_data(class_group, options)
+    end
+  end
+
 end

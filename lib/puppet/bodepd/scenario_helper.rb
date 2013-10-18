@@ -10,6 +10,13 @@ module Puppet
   module Bodepd
     module ScenarioHelper
 
+      def get_class_group_data(class_group, options={})
+        # get the global configuration
+        global_config = find_facts(Puppet[:certname]).merge(get_global_config)
+        class_list = get_classes_from_groups([class_group], global_config)
+        process_class_data(class_list, global_config, options)
+      end
+
       #
       # returns a hash of parameters
       # and list of classes for a given node_name
@@ -67,6 +74,10 @@ module Puppet
         certname      = options[:certname_for_facts]
         global_config = find_facts(certname).merge(get_global_config)
         class_list    = get_classes_per_scenario(global_config, role)
+        process_class_data(class_list, global_config, options)
+      end
+
+      def process_class_data(class_list, global_config, options={})
         class_hash    = {}
 
         class_list.each do |x|
@@ -101,7 +112,7 @@ module Puppet
         end
 
         #
-        # Currently, this is assuming that the data mappings
+        #TODO: Currently, this is assuming that the data mappings
         # have precedence over hiera lookups, this is probably
         # backwards
         #
