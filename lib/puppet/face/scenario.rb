@@ -65,6 +65,10 @@ Puppet::Face.define(:scenario, '0.0.1') do
 
     arguments 'key'
 
+    option '--interpolate_hiera_data' do
+      summary 'Tells hiera to interpolate its data'
+    end
+
     option '--certname_for_facts CERTNAME' do
       summary 'The certname to use to retrieve facts used to compile hierarchies'
       default_to { Puppet[:certname] }
