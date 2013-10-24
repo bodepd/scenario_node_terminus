@@ -258,7 +258,7 @@ EOT
     it 'should load global settings' do
       setup_config_test_data
       setup_global_test_data
-      self.expects('get_hierarchy').with('/etc/puppet/hiera.yaml').returns(["scenario/%{scenario}", 'common'])
+      self.expects('get_hierarchy').returns(["scenario/%{scenario}", 'common'])
       config = get_global_config
       config['foo'].should      == 'baz'
       config['blah'].should     == 'scenario_name'
@@ -354,7 +354,7 @@ EOT
     before :each do
       Puppet.stubs(:[]).with(:confdir).returns('/etc/puppet/')
       # stub the expected hierarchy
-      self.expects('get_hierarchy').with('/etc/puppet/hiera.yaml').returns(["scenario/%{scenario}", 'common'])
+      self.expects('get_hierarchy').returns(["scenario/%{scenario}", 'common'])
       # stub the expected files to be found
       setup_hiera_data
     end
@@ -395,7 +395,7 @@ EOT
     before :each do
       Puppet.stubs(:[]).with(:confdir).returns('/etc/puppet/')
       # stub the expected hierarchy
-      self.expects('get_hierarchy').with('/etc/puppet/hiera.yaml').returns(["scenario/%{scenario}", 'common'])
+      self.expects('get_hierarchy').returns(["scenario/%{scenario}", 'common'])
       # stub the expected files to be found
       setup_data_mappings
     end
@@ -434,15 +434,18 @@ EOF
     end
 
     it 'should return defaults if it cannot find one' do
-      get_hierarchy(@tmp_bad_file).should == ["scenario/%{scenario}", 'common']
+      self.stubs(:get_hierarchy_file).returns(@tmp_bad_file)
+      get_hierarchy.should == ["scenario/%{scenario}", 'common']
     end
 
     it 'should return defaults if it file doees not exist' do
-      get_hierarchy(get_non_file).should == ["scenario/%{scenario}", 'common']
+      self.stubs(:get_hierarchy_file).returns(get_non_file)
+      get_hierarchy.should == ["scenario/%{scenario}", 'common']
     end
 
     it 'should return the current hierarchy' do
-      get_hierarchy(@tmp_good_file).should == ['one', "two/%{two}"]
+      self.stubs(:get_hierarchy_file).returns(@tmp_good_file)
+      get_hierarchy.should == ['one', "two/%{two}"]
     end
 
   end
