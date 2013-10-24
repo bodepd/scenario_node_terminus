@@ -146,7 +146,7 @@ module Puppet
         end
 
 
-        lookups = hiera_data.merge(lookedup_data)
+        lookups = lookedup_data.merge(hiera_data)
 
         if key
           if options[:interpolate_hiera_data]
