@@ -398,8 +398,9 @@ module Puppet
           interpolate_string(data, scope)
         elsif data.is_a?(Array)
           interpolate_array(data, scope)
-        else
-          raise(Error, "Hiera interpolation of type: #{data.type} is not supported")
+        elsif data.is_a?(Hash)
+          data
+          #raise(Error, "Hiera interpolation of type: #{data.class} is not supported")
         end
       end
 
