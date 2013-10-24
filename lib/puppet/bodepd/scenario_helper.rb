@@ -134,9 +134,11 @@ module Puppet
               #
               # I am not sure how forgiving I should be here...
               #
-              if class_list.include?(get_namespace(v))
-                raise(Exception, "data mapping #{v} not found in hiera data")
+              if class_list.include?(get_namespace(k))
+                raise(Exception, "data mapping #{v} not found. Failing b/c it is required for class #{get_namespace(k)}")
               end
+              Puppet.warning("data_mapping key: #{k} maps to #{v} which is not found in hiera data. This may not be an issue, b/c the class #{get_namespace(k)} is not included.")
+              lookedup_data[k] = nil
             end
           else
             lookedup_data[k] = hiera_data[v]
