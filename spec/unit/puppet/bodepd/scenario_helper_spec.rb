@@ -188,11 +188,14 @@ EOT
 
     describe 'when role_mapping is valid' do
       before do
+        self.stubs(:find_facts).returns({'key'=> 'value'})
         setup_config_test_data
         setup_global_test_data
         setup_scenario_test_data
         setup_class_group_test_data
         setup_node_role_mapping
+        setup_hiera_data
+        setup_data_mappings
       end
       it 'should return class list and globals' do
         node1 = get_node_from_name('node1')
