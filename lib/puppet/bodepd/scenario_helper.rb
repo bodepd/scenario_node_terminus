@@ -42,8 +42,7 @@ module Puppet
 
         classification_info[:parameters]['node_data_bindings'] = compile_all_data(
           find_facts(node_name).merge(global_config),
-          classes,
-          {:interpolate_hiera_data => true}
+          classes
         )
 
         classification_info
@@ -89,6 +88,7 @@ module Puppet
         class_list.each do |x|
           class_hash[x] = {}
         end
+        #class_hash['no_matching_class'] = {}
 
         lookups = compile_all_data(global_config, class_list, options)
 
@@ -97,18 +97,19 @@ module Puppet
         # have precedence over hiera lookups, this is probably
         # backwards
         #
-        lookup_without_globals= {}
         lookups.each do |k,v|
           klass_name = get_namespace(k)
           if class_hash[klass_name]
             class_hash[klass_name][k] = v
+          else
+            #class_hash['no_matching_class'][k] = v
           end
         end
         class_hash
 
       end
 
-      def compile_all_data(scope, class_list, options, key=nil)
+      def compile_all_data(scope, class_list, options={}, key=nil)
         # get all keys from data_mappings
         data_mappings = compile_data_mappings(scope, key)
 
@@ -116,7 +117,10 @@ module Puppet
         hiera_data    = compile_hiera_data(
                           scope,
                           'hiera_data',
-                          options[:interpolate_hiera_data]
+                          # never interpolate data here, we cannot assume which keys
+                          # are valid for a given node and I want to fail for interpolation
+                          # failures
+                          false
                         )
 
         # resolve hiera lookups
@@ -139,10 +143,21 @@ module Puppet
           end
         end
 
+
         lookups = hiera_data.merge(lookedup_data)
+
         if key
-          lookups[key]
+          if options[:interpolate_hiera_data]
+            interpolate_data(lookups[key], scope)
+          else
+            lookups[key]
+          end
         else
+          if options[:interpolate_hiera_data]
+            lookups.each do |k,v|
+              lookups[k] = interpolate_data(v, scope)
+            end
+          end
           lookups
         end
 
@@ -200,14 +215,20 @@ module Puppet
       def get_role_classes_from_scenario(name, scope)
         role_classes = {}
         # iterate through each roles in a scenario
-        get_scenario_data(name)['roles'].each do |role_name, values|
+        get_scenario_data(name, scope)['roles'].each do |role_name, values|
           role_classes[role_name] = process_classes(values, scope)
         end
         role_classes
       end
 
       # load a scenario's YAML
-      def get_scenario_data(name)
+      def get_scenario_data(name, scope={})
+        # tmp_hierarchy = get_hierarchy
+        # modify it to change the location of the scenario file
+        # get_keys_per_dir(scope, 'scenarios', hierarchy) do |k,v,data|
+        #    data ||= v
+        # end
+        # this should also follow the hierarchy
         scenario_file = get_data_file(File.join(data_dir, 'scenarios'), "#{name}.yaml")
         unless File.exists?(scenario_file)
           raise(Exception, "scenario file #{scenario_file} does not exist")
@@ -282,7 +303,7 @@ module Puppet
       # through the hierarchy from hiera.yaml
       # and return a list of all keys
       #
-      def get_keys_per_dir(scope, dir)
+      def get_keys_per_dir(scope, dir, hierarchy=get_hierarchy)
         begin
           require 'hiera'
         rescue
@@ -296,7 +317,7 @@ module Puppet
         Hiera::Backend.datasources(
           scope,
           nil,
-          get_hierarchy(hiera_config_file)
+          hierarchy
         ) do |source|
           # search for data overrides in the global_hiera_params directory
           yamlfile = get_data_file(File.join(data_dir, dir), "#{source}.yaml")
@@ -320,7 +341,7 @@ module Puppet
               Puppet.info("Found key: '#{k}' matching: '#{x}'")
               Puppet.info("We will now stop traversing the data_mappings hierarchy")
               Puppet.info("Now, we will look up this key in the hiera_data")
-              return data
+              return {x => k}
             end
           end
           Puppet.info("Did not find anything matching parameter: #{key}") if key
@@ -328,17 +349,12 @@ module Puppet
         end
       end
 
+      # compiles all hiera data in a directory
       def compile_hiera_data(scope ={}, dir='hiera_data', interpolate_hiera_data=true)
         get_keys_per_dir(scope, dir) do |k, v, data|
           unless data[k]
             if interpolate_hiera_data
-              if v.is_a?(String) or v.is_a?(TrueClass) or v.is_a?(FalseClass) or v.is_a?(Fixnum)
-                data[k] = interpolate_string(v, scope)
-              elsif v.is_a?(Array)
-                data[k] = interpolate_array(v, scope)
-              else
-                raise(Error, "Hiera interpolation of type: #{v.type} is not supported")
-              end
+              data[k] = interpolate_data(v, scope)
             else
               data[k] = v
             end
@@ -352,13 +368,18 @@ module Puppet
       # The hierarchy default to scenario/%{scenario}, common if
       # if cannot find one
       #
-      def get_hierarchy(file)
+      def get_hierarchy
+        file = get_hierarchy_file
         default_hierarchy = ["scenario/%{scenario}", 'common']
         if File.exists?(file)
           (YAML.load_file(file) || {})[:hierarchy] || default_hierarchy
         else
           default_hierarchy
         end
+      end
+
+      def get_hierarchy_file
+        File.join(Puppet[:confdir], 'hiera.yaml')
       end
 
       # get Puppet's confdir
@@ -369,6 +390,17 @@ module Puppet
       # get the datadir
       def data_dir
         @data_dir ||= File.join(Puppet[:confdir], 'data')
+      end
+
+      # I should be using Hiera::Interpolate
+      def interpolate_data(data, scope)
+        if [String, TrueClass, FalseClass, Fixnum].include?(data.class)
+          interpolate_string(data, scope)
+        elsif data.is_a?(Array)
+          interpolate_array(data, scope)
+        else
+          raise(Error, "Hiera interpolation of type: #{data.type} is not supported")
+        end
       end
 
       # performs hiera style interpolation on strings
