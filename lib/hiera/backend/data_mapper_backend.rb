@@ -1,3 +1,7 @@
+require File.join(
+  File.dirname(__FILE__), '..', '..',
+  'puppet/bodepd/scenario_helper.rb'
+)
 class Hiera
   module Backend
     class Data_mapper_backend
@@ -9,7 +13,8 @@ class Hiera
             "expected variable: #{node_data_bindings} to be set from node terminus"
           )
         end
-        data_bindings[key]
+        include Puppet::Bodepd::ScenerioHelper
+        interpolate_data(data_bindings[key], scope)
       end
 
     end
