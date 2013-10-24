@@ -224,6 +224,10 @@ EOT
         params['scenario'].should == 'scenario_name'
         params['bar'].should      == 'blah'
       end
+      it 'should compile data in node_data_bindings parameter' do
+        node3 = get_node_from_name('node3')
+        puts node3[:parameters]['node_data_bindings'].inspect
+      end
     end
 
   end
@@ -232,6 +236,120 @@ EOT
 
     it 'should be able to get all class with their parameters'
 
+  end
+
+  describe 'when compiling all data' do
+
+     before do
+       setup_config_test_data
+       setup_global_test_data
+       #setup_hiera_data
+       #setup_data_mappings
+     end
+
+    describe 'when data_mappings do not match keys' do
+
+      before do
+        local_data_mapping = tmp_file(<<-EOT
+verbose:
+  foo::verbose
+EOT
+        )
+        data_mapper_file_stubber('common', local_data_mapping)
+        local_hiera = tmp_file(<<-EOT
+somevar: value
+EOT
+        )
+        hiera_data_file_stubber('common', local_hiera)
+      end
+
+      it 'when key matches class, we should fail' do
+
+        expect do
+          compile_all_data({}, ['foo'], {})
+        end.to raise_error(Exception, /data mapping verbose not found/)
+
+      end
+
+      it 'when key does not match class, warn, and set it to nil' do
+        data = compile_all_data({}, [], {})
+        data['foo::verbose'].should be_nil
+        data.has_key?('foo::verbose')
+      end
+
+    end
+
+
+    describe 'when keys match' do
+
+      before do
+        local_data_mapping = tmp_file(<<-EOT
+key:
+  class::param
+"my_%{foo}":
+  dude::duder
+EOT
+        )
+        data_mapper_file_stubber('common', local_data_mapping)
+        local_hiera = tmp_file(<<-EOT
+foo: bar
+key: value
+a: "%{blah}"
+EOT
+        )
+        hiera_data_file_stubber('common', local_hiera)
+      end
+
+
+      it 'should be able to resovle partial string mathces' do
+        data = compile_all_data({}, [], {})
+        data['dude::duder'].should == 'my_bar'
+      end
+
+      it 'should be able to process a basic match' do
+        data = compile_all_data({}, [], {})
+        data['class::param'].should == 'value'
+      end
+
+      it 'should allow non-mapping hiera globals' do
+        data = compile_all_data({}, [], {})
+        data['foo'].should == 'bar'
+      end
+
+      it 'should not interpolate hiera data by default' do
+        data = compile_all_data({}, [], {})
+        data['a'].should == '%{blah}'
+      end
+
+      it 'should interpolate when enabled' do
+        data = compile_all_data({'blah' => 'v2'}, [], {:interpolate_hiera_data => true})
+        data['a'].should == 'v2'
+      end
+
+      it 'should fail when it cannot interpolate' do
+        expect do
+          compile_all_data({}, [], {:interpolate_hiera_data => true})
+        end.to raise_error(Exception, /Interpolation for blah failed/)
+      end
+
+    end
+
+    it 'hiera keys should override data_mappings' do
+      local_data_mapping = tmp_file(<<-EOT
+key:
+  class::param
+EOT
+        )
+      data_mapper_file_stubber('common', local_data_mapping)
+      local_hiera = tmp_file(<<-EOT
+key: value
+class::param: overridden_value
+EOT
+        )
+      hiera_data_file_stubber('common', local_hiera)
+      data = compile_all_data({}, [], {})
+      data['class::param'].should == 'overridden_value'
+    end
   end
 
   describe 'when getting path information' do
