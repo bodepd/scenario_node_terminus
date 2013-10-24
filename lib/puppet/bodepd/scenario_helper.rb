@@ -5,6 +5,7 @@
 require 'yaml'
 require 'puppet'
 require 'puppet/node'
+require 'puppet/face'
 
 module Puppet
   module Bodepd
@@ -36,8 +37,14 @@ module Puppet
         global_config['role'] = role
 
         # get classes from scenario and role
-        classification_info[:classes] = \
-          (get_classes_per_scenario(global_config, role) || []).uniq
+        classes = (get_classes_per_scenario(global_config, role) || []).uniq
+        classification_info[:classes] = classes
+
+        classification_info[:parameters]['node_data_bindings'] = compile_all_data(
+          find_facts(node_name).merge(global_config),
+          classes,
+          {:interpolate_hiera_data => true}
+        )
 
         classification_info
 
@@ -54,8 +61,7 @@ module Puppet
         Puppet.info("Finding our node's facts and merging them with global data
 ")
         global_config  = find_facts(certname).merge(global_config)
-        data_mapping   = lookup_data_mapping(key, global_config)
-        hiera_data     = lookup_hiera_data(data_mapping || key, global_config)
+        hiera_data     = compile_all_data(global_config, [], options, key)
         Puppet.info("Found value: '#{hiera_data}'")
         hiera_data
       end
@@ -84,12 +90,31 @@ module Puppet
           class_hash[x] = {}
         end
 
+        lookups = compile_all_data(global_config, class_list, options)
+
+        #
+        #TODO: Currently, this is assuming that the data mappings
+        # have precedence over hiera lookups, this is probably
+        # backwards
+        #
+        lookup_without_globals= {}
+        lookups.each do |k,v|
+          klass_name = get_namespace(k)
+          if class_hash[klass_name]
+            class_hash[klass_name][k] = v
+          end
+        end
+        class_hash
+
+      end
+
+      def compile_all_data(scope, class_list, options, key=nil)
         # get all keys from data_mappings
-        data_mappings = compile_data_mappings(global_config)
+        data_mappings = compile_data_mappings(scope, key)
 
         # get hiera data
         hiera_data    = compile_hiera_data(
-                          global_config,
+                          scope,
                           'hiera_data',
                           options[:interpolate_hiera_data]
                         )
@@ -100,9 +125,12 @@ module Puppet
           # specifically check for nil so we don't drop false values
           if hiera_data[v] == nil
             if v =~ /%\{([^\}]*)\}/
-              lookedup_data[k] = interpolate_string(v, global_config.merge(hiera_data))
+              lookedup_data[k] = interpolate_string(v, scope.merge(hiera_data))
             else
-              if class_hash[get_namespace(v)]
+              #
+              # I am not sure how forgiving I should be here...
+              #
+              if class_list.include?(get_namespace(v))
                 raise(Exception, "data mapping #{v} not found in hiera data")
               end
             end
@@ -111,20 +139,12 @@ module Puppet
           end
         end
 
-        #
-        #TODO: Currently, this is assuming that the data mappings
-        # have precedence over hiera lookups, this is probably
-        # backwards
-        #
         lookups = hiera_data.merge(lookedup_data)
-        lookup_without_globals= {}
-        lookups.each do |k,v|
-          klass_name = get_namespace(k)
-          if class_hash[klass_name]
-            class_hash[klass_name][k] = v
-          end
+        if key
+          lookups[key]
+        else
+          lookups
         end
-        class_hash
 
       end
 
@@ -291,57 +311,38 @@ module Puppet
         data
       end
 
-      def compile_data_mappings(scope ={})
+      def compile_data_mappings(scope ={}, key=nil)
         get_keys_per_dir(scope, 'data_mappings') do |k, v, data|
           v = Array(v)
           v.each do |x|
             data[x] ||= k
-          end
-          data
-        end
-      end
-
-      def lookup_data_mapping(key, scope={})
-        Puppet.info("Looking for hiera key: #{key} in data mappings")
-        get_keys_per_dir(scope, 'data_mappings') do |k, v, data|
-          v = Array(v)
-          v.each do |x|
-            if x == key
+            if key and x == key
               Puppet.info("Found key: '#{k}' matching: '#{x}'")
               Puppet.info("We will now stop traversing the data_mappings hierarchy")
               Puppet.info("Now, we will look up this key in the hiera_data")
-              return k
-            end
-            puts x if x =~ /#{key}/
-          end
-        end
-        Puppet.info("Did not find anything matching parameter: #{key}")
-        return nil
-      end
-
-      def lookup_hiera_data(key, scope={})
-        Puppet.info("Looking for hiera key: #{key}")
-        get_keys_per_dir(scope, 'hiera_data') do |k, v, data|
-          if k == key
-            Puppet.info("Found key in hiera with value: #{v}")
-            Puppet.info("We will not stop traversing hiera_data")
-            if v =~ /%\{([^\}]*)\}/
-              Puppet.info("Interpolating value from globals and facts")
-              return interpolate_string(v, scope)
-            else
-              return v
+              return data
             end
           end
+          Puppet.info("Did not find anything matching parameter: #{key}") if key
+          data
         end
       end
 
       def compile_hiera_data(scope ={}, dir='hiera_data', interpolate_hiera_data=true)
         get_keys_per_dir(scope, dir) do |k, v, data|
-          data[k] ||= \
-                    ((interpolate_hiera_data &&
-                     interpolate_string(v, scope)) ||
-                     v
-                    )
+          unless data[k]
+            if interpolate_hiera_data
+              if v.is_a?(String) or v.is_a?(TrueClass) or v.is_a?(FalseClass) or v.is_a?(Fixnum)
+                data[k] = interpolate_string(v, scope)
+              elsif v.is_a?(Array)
+                data[k] = interpolate_array(v, scope)
+              else
+                raise(Error, "Hiera interpolation of type: #{v.type} is not supported")
+              end
+            else
+              data[k] = v
+            end
+          end
           data
         end
       end
@@ -383,7 +384,7 @@ module Puppet
 
       # allows for interpolation of each string in an array
       def interpolate_array(a, scope={})
-        (a || []).map {|x| interpolate_string(x, scope)}
+        result = (a || []).map {|x| interpolate_string(x, scope)}
       end
 
       def find_facts(certname)
