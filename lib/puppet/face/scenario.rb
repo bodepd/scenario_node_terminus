@@ -2,7 +2,12 @@ require File.join(
   File.dirname(__FILE__), '..', '..',
   'puppet/bodepd/scenario_helper.rb'
 )
+require File.join(
+  File.dirname(__FILE__), '..', '..',
+  'puppet/bodepd/scenario_installer.rb'
+)
 include Puppet::Bodepd::ScenarioHelper
+include Puppet::Bodepd::ScenarioInstaller
 
 Puppet::Face.define(:scenario, '0.0.1') do
   action :compile_role do
@@ -109,6 +114,30 @@ Puppet::Face.define(:scenario, '0.0.1') do
     when_invoked do |class_group, options|
       get_class_group_data(class_group, options)
     end
+  end
+
+  action :get_user_inputs do
+
+    summary 'given a role in the current scenario, show me the current state of user data'
+
+    option '--role ROLE' do
+      summary 'The role to use'
+    end
+
+    when_invoked do |options|
+      get_user_data(options)
+    end
+
+  end
+
+  action :setup_scenario_data do
+
+    summary 'interactive scenario setup tool. WARNING. This is just a prototype'
+
+    when_invoked do |options|
+      setup_data(options)
+    end
+
   end
 
 end
