@@ -216,26 +216,48 @@ module Puppet
       # be applied a part of that role
       def get_role_classes_from_scenario(name, scope)
         role_classes = {}
+        scope = scope.merge({'scenario' => name})
         # iterate through each roles in a scenario
-        get_scenario_data(name, scope)['roles'].each do |role_name, values|
-          role_classes[role_name] = process_classes(values, scope)
+        scenario_data = get_scenario_data(name, scope)
+        (scenario_data['roles'] || []).each do |role_name, values|
+          role_classes[role_name] = process_classes(values, scope).uniq
         end
         role_classes
       end
 
       # load a scenario's YAML
       def get_scenario_data(name, scope={})
-        # tmp_hierarchy = get_hierarchy
-        # modify it to change the location of the scenario file
-        # get_keys_per_dir(scope, 'scenarios', hierarchy) do |k,v,data|
-        #    data ||= v
-        # end
-        # this should also follow the hierarchy
-        scenario_file = get_data_file(File.join(data_dir, 'scenarios'), "#{name}.yaml")
-        unless File.exists?(scenario_file)
-          raise(Exception, "scenario file #{scenario_file} does not exist")
+        hierarchy = get_hierarchy.collect do |category|
+          if category == 'scenario/%{scenario}'
+            "%{scenario}"
+          else
+            category
+          end
         end
-        YAML.load_file(scenario_file)
+        unless hierarchy.include?("%{scenario}")
+          raise(Exception, "Having a hierachy named scenario is required")
+        end
+        data = get_keys_per_dir(scope, 'scenarios', hierarchy) do |k,v,data|
+          if data == {}
+            {k=>v}
+          else
+            # we need to merge stuff together
+            # if we find new roles, just add them
+            v.each do |role, classes|
+              if data['roles'].has_key?(role)
+                data['roles'][role]['classes'] = ((data['roles'][role]['classes'] || []) |
+                                                  ( classes['classes'] || []))
+                data['roles'][role]['class_groups'] = ((data['roles'][role]['class_groups'] || []) |
+                                                       (classes['class_groups'] || []))
+                data
+              else
+                data['roles'][role] = classes
+              end
+            end
+            data
+          end
+        end
+        data
       end
 
       # returns all classes in the specified groups
