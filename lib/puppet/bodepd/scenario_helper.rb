@@ -14,8 +14,58 @@ module Puppet
       def get_class_group_data(class_group, options={})
         # get the global configuration
         global_config = find_facts(Puppet[:certname]).merge(get_global_config)
-        class_list = get_classes_from_groups([class_group], global_config)
+        class_list    = get_classes_from_groups([class_group], global_config)
         process_class_data(class_list, global_config, options)
+      end
+
+      def get_user_data(options={})
+        global_config     = find_facts(Puppet[:certname]).merge(get_global_config)
+        # get all data mapping keys
+        data_mappings     = compile_data_mappings(global_config)
+        data_mapping_keys = data_mappings.values.uniq
+        munged_keys       = {}
+        # process interpolated keys
+        data_mapping_keys.each do |x|
+          if x =~ /%\{([^\}]*)\}/
+            x.gsub(/%\{([^\}]*)\}/) do
+              munged_keys[$1] = nil
+            end
+          else
+            munged_keys[x] = nil
+          end
+        end
+        hiera_data    = compile_hiera_data(
+                          global_config,
+                          'hiera_data',
+                          # never interpolate data here, we cannot assume which keys
+                          # are valid for a given node and I want to fail for interpolation
+                          # failures
+                          false
+                        )
+        munged_keys.each do |k, v|
+          munged_keys[k] = hiera_data[k]
+        end
+
+        if role = options[:role]
+          # I'm going to do this the slow way ;)
+          class_list = get_classes_per_scenario(global_config, role)
+          keep_hash = {}
+          data_mappings.each do |k, v|
+            if class_list.include?(get_namespace(k))
+              if v =~ /%\{([^\}]*)\}/
+                v.gsub(/%\{([^\}]*)\}/) do
+                  keep_hash[$1] = munged_keys[$1]
+                end
+              else
+                keep_hash[v] = munged_keys[v]
+              end
+            end
+          end
+          munged_keys = keep_hash
+        end
+
+        munged_keys.delete_if {|k,v| v == nil && global_config[k] }
+
       end
 
       #
