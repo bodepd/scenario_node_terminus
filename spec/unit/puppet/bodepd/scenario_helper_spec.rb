@@ -129,6 +129,13 @@ EOT
   end
 
   def setup_scenario_test_data
+    @common_scenario = tmp_file(<<-EOT
+common_roles:
+  role0:
+    classes:
+      - one
+EOT
+    )
     @scenario = tmp_file(<<-EOT
 roles:
   role1:
@@ -142,6 +149,7 @@ roles:
       - "%{foo}"
 EOT
     )
+    scenario_file_stubber('common', @common_scenario)
     scenario_file_stubber('scenario_name' ,@scenario)
   end
 
@@ -226,7 +234,6 @@ EOT
       end
       it 'should compile data in node_data_bindings parameter' do
         node3 = get_node_from_name('node3')
-        puts node3[:parameters]['node_data_bindings'].inspect
       end
     end
 
@@ -236,6 +243,105 @@ EOT
 
     it 'should be able to get all class with their parameters'
 
+  end
+
+  describe 'when getting classes for a scenario' do
+
+    before do
+
+      basic_scenario = tmp_file(<<-EOT
+roles:
+  role1:
+    classes:
+      - one
+  role2:
+    classes:
+      - two
+ EOT
+       )
+      scenario_file_stubber('basic_scenario' ,basic_scenario)
+      interpolated_scenario = tmp_file(<<EOT
+
+roles:
+  role3:
+    classes:
+      - "%{foo}"
+EOT
+      )
+      scenario_file_stubber('interpolated_scenario', interpolated_scenario)
+    end
+
+    describe 'with no overrides' do
+
+      before do
+        self.expects('get_hierarchy').returns(["scenario/%{scenario}"])
+      end
+
+      it 'should be able to get roles and their classes' do
+        roles = get_role_classes_from_scenario('basic_scenario', {})
+        roles['role1'].should == ['one']
+        roles['role2'].should == ['two']
+      end
+      it 'should fail if it cannot resolve interpolated globals' do
+        expect do
+          get_role_classes_from_scenario('interpolated_scenario', {})
+        end.to raise_error(Exception, 'Interpolation for foo failed')
+      end
+      it 'should be able to interpolate classes' do
+        roles = get_role_classes_from_scenario('interpolated_scenario',
+          {'foo' => 'bar'}
+        )
+        roles['role3'].should == ['bar']
+      end
+      it 'should work for a more complete example' do
+        setup_scenario_test_data
+        setup_class_group_test_data
+        roles = get_role_classes_from_scenario('scenario_name',
+          {'four' => 'five', 'foo' => 'bar'}
+        )
+        roles['role2'].should == ['bar']
+        ['one', 'two', 'three', 'five'].each do |x|
+          roles['role1'].include?(x).should be_true
+        end
+      end
+    end
+    describe 'with overrides' do
+      before do
+        common_scenario = tmp_file(<<-EOT
+roles:
+  role0:
+    classes:
+      - zero
+ EOT
+         )
+        scenario_file_stubber('common', common_scenario)
+      end
+      it 'should be able to add roles' do
+        self.expects('get_hierarchy').returns(["scenario/%{scenario}", 'common'])
+        roles = get_role_classes_from_scenario('basic_scenario', {})
+        roles['role0'].should == ['zero']
+        roles['role1'].should == ['one']
+        roles['role2'].should == ['two']
+      end
+      it 'should be able to add classes' do
+        override_scenario = tmp_file(<<-EOT
+roles:
+  role1:
+    classes:
+      - three
+ EOT
+         )
+        scenario_file_stubber('overrides', override_scenario)
+        self.expects('get_hierarchy').returns(["scenario/%{scenario}", 'common', 'overrides'])
+        roles = get_role_classes_from_scenario('basic_scenario', {})
+        roles['role0'].should == ['zero']
+        roles['role2'].should == ['two']
+        roles['role1'].sort.should == ['one', 'three']
+
+      end
+      it 'should be able to add class groups'
+
+    end
   end
 
   describe 'when compiling all data' do
