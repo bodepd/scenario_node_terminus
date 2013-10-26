@@ -12,12 +12,19 @@
     * [Data Mappings](#data-mappings)
     * [Hiera Data](#hiera-data)
 3. [Installation - The basics of getting started](#setup)
-4. [Command Line Tools](#cli)
+4. [Command Line Debugging Tools](#cli)
+5. [Getting Required User Configuration](#user-data)
 5. [Implementation - An under-the-hood peek at what the module is doing](#implementation)
 
 ## Overview
 
 This module contains a custom node terminus that provides deployment flexibility.
+
+Although it was specific designed with Openstack deployment in mind, its
+functionality has application beyond Openstack.
+
+It was intended to simplify deployments of multiple reference architectures for
+a single system.
 
 ## Module Description
 
@@ -247,7 +254,7 @@ probably override), but this is how it works at the moment.
       - global/${global_hiera_param}
       - common
 
-## Command Line Tools
+## Command Line Debugging Tools
 
 This module also comes with a collection of tools that can be used for debugging:
 
@@ -259,15 +266,80 @@ or to learn about an individual command:
 
     puppet help scenario get_classes
 
-It currently supports two commands:
+The data model exists outside of Puppet and is forwarded to
+Puppet using a node terminus interface.
+
+It currently supports several commands that can be used to pre-generate
+parts of the data model for debugging purposes::
+
+### get scenario
+
+Returns the currently configured scenario:
+
+    puppet scenario get_scenario
+
+### get roles
+
+Returns the list of roles for the current scenario along with their classes.
+
+### get classes
 
 To retrieve the list of classes that are associated with a role:
 
     puppet scenario get_classes <ROLE_NAME> --render-as yaml
 
+### get class group
+
+Retrieves the set of classes currently included in a class group.
+
+    puppet scenario get_class_group <class_group_name>
+
+### get all data
+
 To retrieve the list of classes together with their specified data:
 
     puppet scenario compile_role <ROLE_NAME> --render-as yaml
+
+This command is very similar to how Puppet interacts with the scenario
+based data model.
+
+### Getting Required User Configuration
+
+Another use case of the data model is to generate data that can be compiled
+to a list of configuration options available to an end user.
+
+In this model, the data\_mappings are used to not only express the way that
+a single key can populate multiple class parameters, it also is used to
+signify all of the keys that should be exposed to an end user as a part of the
+basic configuraiton.
+
+### getting all current user data
+
+The following command can be used to provide a list of all data that a user
+may want to configure in their hiera\_data/user.yaml
+
+    puppet scenario get_user_inputs
+
+This command takes the current scenario and global settings into
+account and produces a list of the configuration settings a user
+may want to adjust along with their default values.
+
+It also accepts --role, if you only want to get the settings that
+are applicable to a specific role.
+
+    puppet scenario get_user_inputs --role=build-server
+
+### allow users to interactively specify data
+
+  NOTE: this is still a prototype and is not fully functional
+
+The following command can be used to supply user configuration data
+to build out an example model:
+
+    puppet scenario setup_scenario_data
+
+It will prompt users for tons of questions related to how to configure
+their specified deployment scenario.
 
 ## Implementation
 
