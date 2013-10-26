@@ -5,7 +5,7 @@
 1. [Overview - What is the scenario node terminus?](#overview)
 2. [Module Description - What does it do?](#module-description)
     * [Scenario Selection](#scenario-selection)
-    * [Global Parameters](#global_params)
+    * [Global Parameters](#global-params)
     * [Scenarios](#scenarios)
     * [Class Groups](#class-groups)
     * [Role Mappings](#role-mappings)
