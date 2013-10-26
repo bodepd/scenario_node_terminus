@@ -3,32 +3,145 @@
 ####Table of Contents
 
 1. [Overview - What is the scenario node terminus?](#overview)
-2. [Module Description - What does it do?](#module-description)
+2. [Hiera Primer - Understanding the model](#hiera-primer)
+    * [Hierarchies and Global Variables](#hierarchies-and-global-variables)
+    * [Variable interpolation](#variable-interpolation)
+3. [Module Description - What does it do?](#module-description)
     * [Scenario Selection](#scenario-selection)
-    * [Global Parameters](#global-params)
+    * [Global Parameters](#global-parameters)
     * [Scenarios](#scenarios)
     * [Class Groups](#class-groups)
     * [Role Mappings](#role-mappings)
     * [Data Mappings](#data-mappings)
     * [Hiera Data](#hiera-data)
-3. [Installation - The basics of getting started](#setup)
-4. [Command Line Debugging Tools](#cli)
-5. [Getting Required User Configuration](#user-data)
-5. [Implementation - An under-the-hood peek at what the module is doing](#implementation)
+4. [Installation - The basics of getting started](#installation)
+5. [Command Line Debugging Tools](#command-line-debugging-tools)
+6. [Getting Required User Configuration](#getting-required-user-configuration)
+7. [Implementation - An under-the-hood peek at what the module is doing](#implementation)
 
 ## Overview
 
-This module contains a custom node terminus that provides deployment flexibility.
+This module allow users to specify a data layer that lives on top of Puppet
+and allows an additional level of flexibility to deployments.
 
-Although it was specific designed with Openstack deployment in mind, its
-functionality has application beyond Openstack.
+Is was designed to compose a set of core Puppet modules into multiple deployment
+permutations (or reference architectures) called scenarios while requiring as
+little duplicate code as possible.
 
-It was intended to simplify deployments of multiple reference architectures for
-a single system.
+Each scenario can also be configured in many ways.
+
+Although it was originally designed with the Openstack modules in mind,
+it has a great potential to be leveraged outside of that project.
+
+## Hiera Primer
+
+Understanding hiera as well the Puppet's data binding system available in 3.x
+are crucial for understanding this model.
+
+This model borrows heavily from both hiera concepts as well as APIs.
+
+Hiera allows users to supply data sets to supply data to your Puppet classes
+in a way that can be configured based on a set of provided global variables.
+
+### Hierarchies and Global Variables
+
+Hiera uses a set of know global variables (for typical hiera use cases,
+these globals are synonymous with facts) to determine the value that should
+be provided for each piece of data that it needs to lookup.
+
+The way in which those variables effect the final value of an individual piece
+of data is driven by the hierarchy specified in hiera's configuration file.
+
+Given the following hierarchy from hiera.yaml:
+
+     ---
+    :hierarchy:
+      - "hostname/%{hostname}"
+      - user
+      - "osfamily/%{osfamily}"
+      - "scenario/%{scenario}"
+      - common
+
+Hiera will looks in a set of files for data values that match a specific key. The data
+files that it searches are determined by using a set of global data specified
+to check data in the associated file.
+
+Assume the following:
+
+  * data will be searched from : /etc/puppet/data/hiera\_data
+  * the hierarchy key in our hiera.yaml file is the same as above
+  * The following global variables are available to hiera
+
+    osfamily: redhat
+    scenario: all_in_one
+    hostname: my_host.domain.name
+
+When hiera searches for that key, it will do the following:
+
+1. use the global variables to build out the list of files to search for our key.
+
+Using the provided hierarchy and set of global variables, this would be
+
++ /etc/puppet/data/hiera\_data/hostname/my\_host.domain.name.yaml
++ /etc/puppet/data/hiera\_data/user.yaml
++ /etc/puppet/data/hiera\_data/osfamily/redhat.yaml
++ /etc/puppet/data/hiera\_data/scenario/all\_in\_one.yaml
++ /etc/puppet/data/hiera\_data/common.yaml
+
+2. Search those files in the same order as they are provided in hiera.yaml.
+This order also implies their lookup precedence. The first value that hiera
+finds is the value that is provided for that variable.
+
+for example, if we were lookup up the key *variable1*
+
++ if my\_host.domain.name.yaml has the key *variable1*, this values will
+be used.
+
+    variable1: value_from_hostname
+
+### Variable interpolation
+
+Sometimes the value returned form a hiera value lookup is not a static string,
+or array, but a variable that should be interpolated from the current set
+of global variables.
+
+Using the same globals set in the previous section, if the value for *variable2*
+is derived as *"%{scenario}"*
+
+The value for that key would be *all_in_one*
+
+### How this applies to the data model
+
+The data model is based on hiera, but has several sets of hiera data that are processed.
+
+This data is processed via the hierarchy in hiera.yaml to determine:
+
++ what global data should be used to process data values
++ what roles exist as a part of the current deployment model
++ what classes should be applied as a part of a role
++ what hiera data should be set for a class
+
+In fact, the data model is composed of the following parts that are processed in this order:
+
+* global hiera data
+* scenario
+* data mappings
+* hiera data
+
+The following image shows both the processing order of each data type and the
+global variables used to determine how it's hierarchy is processed.
+
+![](https://raw.github.com/bodepd/scenario_node_terminus/hiera_docs/docs/images/data_model_scopes.png)
+
+### Further reading
+
+Here is the upstream documentation for [hiera](http://docs.puppetlabs.com/hiera/1/) and
+[data bindings](http://docs.puppetlabs.com/hiera/1/puppet.html#automatic-parameter-lookup)
+
 
 ## Module Description
 
-This model providers a data layer that sits above you Puppet manifests.
+This model providers a data layer that sits above your Puppet manifests.
 
 This data layer can be used instead of composition manifests and
 roles/profiles.
@@ -350,9 +463,3 @@ Technically, it is implemented as a custom hiera backend, and an external node c
 considered as the same thing)
 
 It is critical to understand the following in order to understand this model:
-
-### How Puppet Data Bindings work
-
-### What a custom hiera backend is
-
-### What a node terminus
