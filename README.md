@@ -36,10 +36,13 @@ it has a great potential to be leveraged outside of that project.
 Understanding hiera as well the Puppet's data binding system available in 3.x
 are crucial for understanding this model.
 
-This model borrows heavily from both hiera concepts as well as APIs.
+This model borrows heavily from both hiera concepts as well as its internal APIs.
 
-Hiera allows users to supply data sets to supply data to your Puppet classes
-in a way that can be configured based on a set of provided global variables.
+To summarize
+
+*Hiera + data bindings* - provide a way to decouple setting class parameters from
+the inclusion of classes. It also allows for the selection of data based on a set
+of variables (typically facts) available when your data sets are processed.
 
 ### Hierarchies and Global Variables
 
@@ -68,37 +71,36 @@ to check data in the associated file.
 Assume the following:
 
   * data will be searched from : /etc/puppet/data/hiera\_data
-  * the hierarchy key in our hiera.yaml file is the same as above
+  * the hierarchy in our hiera.yaml file is the same as above
   * The following global variables are available to hiera
 
-    osfamily: redhat
-    scenario: all_in_one
-    hostname: my_host.domain.name
+        osfamily: redhat
+        scenario: all_in_one
+        hostname: my_host.domain.name
 
 When hiera searches for that key, it will do the following:
 
 1. use the global variables to build out the list of files to search for our key.
 
-Using the provided hierarchy and set of global variables, this would be
+  Using the provided hierarchy and set of global variables, this would be
 
-+ /etc/puppet/data/hiera\_data/hostname/my\_host.domain.name.yaml
-+ /etc/puppet/data/hiera\_data/user.yaml
-+ /etc/puppet/data/hiera\_data/osfamily/redhat.yaml
-+ /etc/puppet/data/hiera\_data/scenario/all\_in\_one.yaml
-+ /etc/puppet/data/hiera\_data/common.yaml
+  + /etc/puppet/data/hiera\_data/hostname/my\_host.domain.name.yaml
+  + /etc/puppet/data/hiera\_data/user.yaml
+  + /etc/puppet/data/hiera\_data/osfamily/redhat.yaml
+  + /etc/puppet/data/hiera\_data/scenario/all\_in\_one.yaml
+  + /etc/puppet/data/hiera\_data/common.yaml
 
-NOTE: In this example, the db\_type hierarchy is ignored because there is no
-global variable set for db\_type. If one of the specified files does not exist,
-it is also ignored.
+  NOTE: In this example, the db\_type hierarchy is ignored because there is no
+  global variable set for db\_type. If one of the specified files does not exist,
+  it is also ignored.
 
 2. Search those files in the same order as they are provided in hiera.yaml.
 This order also implies their lookup precedence. The first value that hiera
 finds is the value that is provided for that variable.
 
-for example, if we were lookup up the key *variable1*
+  for example, if we were lookup up the key *variable1*
 
-+ if my\_host.domain.name.yaml has the key *variable1*, this values will
-be used.
+  + if my\_host.domain.name.yaml has the key *variable1*, this values will be used.
 
     variable1: value_from_hostname
 
@@ -389,7 +391,7 @@ probably override), but this is how it works at the moment.
 ## Installation
 
 1. install this module
-2. synchronize it's plug-ins
+2. If you plan to use this from a puppet master, you must synchronize it's plug-ins
 3. configure puppet.conf
 
 /etc/puppet/puppet.conf
