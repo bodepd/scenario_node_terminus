@@ -28,8 +28,6 @@ Is was designed to compose a set of core Puppet modules into multiple deployment
 permutations (or reference architectures) called scenarios while requiring as
 little duplicate code as possible.
 
-Each scenario can also be configured in many ways.
-
 Although it was originally designed with the Openstack modules in mind,
 it has a great potential to be leveraged outside of that project.
 
@@ -172,8 +170,23 @@ to effect the hierarchical overrides that will be used to determine both
 the classes contained in a scenario roles as well as the hiera overrides
 for both data mappings and the regular yaml hierarchy.
 
-The selection of the global\_hiera\_params is driven by hiera using the following
-hierarchy:
+To get a better understand of what global are and how they interact with hiera,
+check out the following sections from this README:
+
+* [Hierarchies and Global Variables](#hierarchies-and-global-variables)
+* [Variable Interpolation in Hiera](#variable-interpolation)
+
+The selection of the global\_hiera\_params is driven by hiera using whatever
+hierarchy is configured in your hiera.yaml file.
+
+At least the following hierarchy is recommended for overrides of your globals:
+
+    - user
+    - "scenario/%{scenario}"
+    - common
+
+Given the above hierarchy, the following files would be used to resolve your
+globals.
 
   - global\_hiera\_params/user.yaml - users can provide their own global
   overrides in this file.
@@ -185,6 +198,11 @@ These variables are used by hiera to determine both what classes are included as
 part of the role lookup, and are also used to drive the hierarchical lookups of
 data both by effecting the configuration files that are consulted (like the scenario
 specific config file from above)).
+
+The following diagram show how the global configuration effects other hierarchical
+overrides:
+
+![](https://raw.github.com/bodepd/scenario_node_terminus/hiera_docs/docs/images/globals_and_scope.png)
 
 ### Scenarios
 
