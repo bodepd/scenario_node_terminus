@@ -141,13 +141,13 @@ Here is the upstream documentation for [hiera](http://docs.puppetlabs.com/hiera/
 
 ## Module Description
 
-This model providers a data layer that sits above your Puppet manifests.
+This model provides a data layer that sits above your Puppet manifests.
 
 This data layer can be used instead of composition manifests and
 roles/profiles.
 
 The data layer is processed into a list of classes as well as data\_bindings
-that should be used to configure a node.
+that should be used to configure a node's class parameters.
 
 ### Scenario Selection
 
