@@ -46,7 +46,7 @@ of variables (typically facts) available when your data sets are processed.
 
 ### Hierarchies and Global Variables
 
-Hiera uses a set of know global variables (for typical hiera use cases,
+Hiera uses a set of known global variables (for typical hiera use cases,
 these globals are synonymous with facts) to determine the value that should
 be provided for each piece of data that it needs to lookup.
 
@@ -64,9 +64,9 @@ Given the following hierarchy from hiera.yaml:
       - "scenario/%{scenario}"
       - common
 
-Hiera will looks in a set of files for data values that match a specific key. The data
-files that it searches are determined by using a set of global data specified
-to check data in the associated file.
+Hiera searches a set of files for data values that match a specific key. The data
+files that it searches are determined by using a set of global data to figure out
+which files form the hierarchy it should use.
 
 Assume the following:
 
@@ -78,31 +78,26 @@ Assume the following:
         scenario: all_in_one
         hostname: my_host.domain.name
 
-When hiera searches for that key, it will do the following:
+When hiera searches for that a specified key, it will do the following:
 
-1. use the global variables to build out the list of files to search for our key.
-
-  Using the provided hierarchy and set of global variables, this would be
-
+1. Use the hierarchy from hiera.yaml together with global variables to build
+out the list of files to search for the desired key.
   + /etc/puppet/data/hiera\_data/hostname/my\_host.domain.name.yaml
   + /etc/puppet/data/hiera\_data/user.yaml
   + /etc/puppet/data/hiera\_data/osfamily/redhat.yaml
   + /etc/puppet/data/hiera\_data/scenario/all\_in\_one.yaml
   + /etc/puppet/data/hiera\_data/common.yaml
 
-  NOTE: In this example, the db\_type hierarchy is ignored because there is no
-  global variable set for db\_type. If one of the specified files does not exist,
-  it is also ignored.
+  > NOTE: In this example, the db\_type hierarchy is ignored because there is no
+  > global variable set for db\_type. If one of the specified files does not exist,
+  > it is also ignored.
 
 2. Search those files in the same order as they are provided in hiera.yaml.
 This order also implies their lookup precedence. The first value that hiera
 finds is the value that is provided for that variable.
 
-  for example, if we were lookup up the key *variable1*
-
-  + if my\_host.domain.name.yaml has the key *variable1*, this values will be used.
-
-    variable1: value_from_hostname
+  For example, the value from my\_host.domain.name.yaml will always be used if
+  available.
 
 ### Variable interpolation
 
