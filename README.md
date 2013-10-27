@@ -129,7 +129,7 @@ In fact, the data model is composed of the following parts that are processed in
 The following image shows both the processing order of each data type and the
 global variables used to determine how it's hierarchy is processed.
 
-![](https://raw.github.com/bodepd/scenario_node_terminus/hiera_docs/docs/images/data_model_scopes.png)
+![](https://raw.github.com/bodepd/scenario_node_terminus/master/docs/images/data_model_scopes.png)
 
 ### Further reading
 
@@ -202,7 +202,7 @@ specific config file from above)).
 The following diagram show how the global configuration effects other hierarchical
 overrides:
 
-![](https://raw.github.com/bodepd/scenario_node_terminus/hiera_docs/docs/images/globals_and_scope.png)
+![](https://raw.github.com/bodepd/scenario_node_terminus/master/docs/images/globals_and_scope.png)
 
 ### Scenarios
 
