@@ -57,6 +57,7 @@ Given the following hierarchy from hiera.yaml:
       - "hostname/%{hostname}"
       - user
       - "osfamily/%{osfamily}"
+      - "db/%{db_type}"
       - "scenario/%{scenario}"
       - common
 
@@ -85,6 +86,10 @@ Using the provided hierarchy and set of global variables, this would be
 + /etc/puppet/data/hiera\_data/osfamily/redhat.yaml
 + /etc/puppet/data/hiera\_data/scenario/all\_in\_one.yaml
 + /etc/puppet/data/hiera\_data/common.yaml
+
+NOTE: In this example, the db\_type hierarchy is ignored because there is no
+global variable set for db\_type. If one of the specified files does not exist,
+it is also ignored.
 
 2. Search those files in the same order as they are provided in hiera.yaml.
 This order also implies their lookup precedence. The first value that hiera
@@ -163,6 +168,12 @@ It contains a single configuration:
    Scenario is also passed to Puppet as a global variable and used to drive
    both interpolation as well as category selection in hiera.
 
+#### Debugging Scenario Selection
+
+The following command returns the current scenario:
+
+    puppet scenario get_scenario
+
 ### Global Parameters
 
 This directory is used to specify the global variables that can be used
@@ -204,6 +215,12 @@ overrides:
 
 ![](https://raw.github.com/bodepd/scenario_node_terminus/master/docs/images/globals_and_scope.png)
 
+#### Debugging Globals
+
+Globals are required by almost everyone subcommand of the *puppet scenario*
+command. To see how globals are compiled, and what the current values are,
+run commands that require globals with --debug.
+
 ### Scenarios
 
 Scenarios are used to describe the roles that should be deployed as a part of
@@ -228,7 +245,6 @@ Scenarios are constructed by compiling hierarchies in your
 Each of the roles for a specific scenario is specified in its scenario
 files:
 
-
   - scenarios/user.yaml - users can provide their own global
   overrides in this file.
   - scenarios/%{scenario\_name}.yaml - Default values for a specific
@@ -239,6 +255,14 @@ files:
 You can also insert custom hierarchies based on hiera\_global\_params to customize
 the way that roles can be overridden.
 
+#### Debugging Scenarios
+
+The following subcommands are useful for debugging scenarios:
+
+* [Show the list of all classes for a given role](#get-classes-per-role)
+* [Show a list of all available roles](#get-roles)
+* [Compile all classes and data for a role](#compile-an-entire-role)
+
 ### Class Groups
 
 Class groups are a set of classes that can be referenced by a
@@ -246,7 +270,7 @@ single identifier. Class groups are used to store combinations
 of classes for reuse.
 
 For example, if several classes are required to build out a role
-called nova compute, then it's class group might look like this:
+called nova compute, then its class group might look like this:
 
   data/class\_groups/nova\_compute.yaml
 
@@ -263,11 +287,16 @@ called nova compute, then it's class group might look like this:
 
 Two things to note here:
 
-1. It contains a list of classes that comprise nova compute
+1. The nova\_compute class group contains a list of classes that comprise nova compute
 2. Some of the classes use the hiera syntax for variable interpolation to
    set the names of classes used to the values provided from the
    hiera\_global\_params.
 3. class groups can themselves can contain class groups.
+
+#### Debugging Class Groups
+
+The [puppet scenario get\_class\_group](#get-class-group) command can be used
+to debug class groups.
 
 ### Role Mappings
 
@@ -298,16 +327,15 @@ would try to match
 * foo.bar
 * foo
 
-**TODO: the role mappings do not currently support regex, but probably need to**
+**TODO: the role mappings do not currently support regex, but probably needs to**
 
 ### Data Mappings
 
-Data mappings are used to express the way in which
-global variables from map to individual class parameters.
+Data mappings are used to express the way in which global variables from hiera
+can map to one or many class parameters.
 
-Previous, this was done with parameter forwarding in parameterized
-classes. In fact, this style of parameter forwarding is one of the main
-functions of the previous openstack module.
+Previous, this could be done with parameter forwarding in parameterized
+classes, or by making explicit hiera calls.
 
 The example below, shows how parameterized class forwarding could be used
 to indicate that a single value called verbose should be used to set
@@ -403,29 +431,25 @@ Puppet using a node terminus interface.
 It currently supports several commands that can be used to pre-generate
 parts of the data model for debugging purposes::
 
-### get scenario
+### Get Scenario
 
 Returns the currently configured scenario:
 
     puppet scenario get_scenario
 
-### get roles
+### Get Roles
 
 Returns the list of roles for the current scenario along with their classes.
 
-### get classes
+    puppet scenario get_role
+
+### Get Classes per Role
 
 To retrieve the list of classes that are associated with a role:
 
     puppet scenario get_classes <ROLE_NAME> --render-as yaml
 
-### get class group
-
-Retrieves the set of classes currently included in a class group.
-
-    puppet scenario get_class_group <class_group_name>
-
-### get all data
+### Compile an Entire Role
 
 To retrieve the list of classes together with their specified data:
 
@@ -433,6 +457,12 @@ To retrieve the list of classes together with their specified data:
 
 This command is very similar to how Puppet interacts with the scenario
 based data model.
+
+### Get Class Group
+
+Retrieves the set of classes currently included in a class group.
+
+    puppet scenario get_class_group <class_group_name>
 
 ### Getting Required User Configuration
 
