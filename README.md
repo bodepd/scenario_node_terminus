@@ -6,14 +6,15 @@
 2. [Hiera Primer - Understanding the model](#hiera-primer)
     * [Hierarchies and Global Variables](#hierarchies-and-global-variables)
     * [Variable interpolation](#variable-interpolation)
-3. [Module Description - What does it do?](#module-description)
+3. [Data Descriptions - What are the data types?](#data-descriptions)
     * [Scenario Selection](#scenario-selection)
     * [Global Parameters](#global-parameters)
     * [Scenarios](#scenarios)
     * [Class Groups](#class-groups)
     * [Role Mappings](#role-mappings)
-    * [Data Mappings](#data-mappings)
-    * [Hiera Data](#hiera-data)
+    * [Resolving variable values](#resolving-variable-values)
+        * [Data Mappings](#data-mappings)
+        * [Hiera Data](#hiera-data)
 4. [Installation - The basics of getting started](#installation)
 5. [Command Line Debugging Tools](#command-line-debugging-tools)
 6. [Getting Required User Configuration](#getting-required-user-configuration)
@@ -40,18 +41,35 @@ This model borrows heavily from both hiera concepts as well as its internal APIs
 
 To summarize
 
-*Hiera + data bindings* - provide a way to decouple setting class parameters from
-the inclusion of classes. It also allows for the selection of data based on a set
-of variables (typically facts) available when your data sets are processed.
+*Hiera + data bindings* - Provides a data lookup system for class parameters
+that is decoupled from how those classes are added to Puppet.
+
+For example, if I define the following class:
+
+    class foo($var) {
+      ...
+    }
+
+It could be included anywhere as:
+
+    include foo
+
+Puppet's data bindings provide hooks that are called when the catalog is
+compiled that call an individual method to look up the value of each
+class parameter. For the example above, this would result in a lookup
+of **foo::var**.
+
+Hiera provides the capability to use hierarchical overrides in order to
+determine what the value of each piece of data is.
 
 ### Hierarchies and Global Variables
 
-Hiera uses a set of known global variables (for typical hiera use cases,
-these globals are synonymous with facts) to determine the value that should
-be provided for each piece of data that it needs to lookup.
+Hiera uses a set of known global variables, referred to as a scope, to determine
+the value of each class parameter. For the typical hiera use case, the scope
+consists of the facts retrieved for a machine.
 
 The way in which those variables effect the final value of an individual piece
-of data is driven by the hierarchy specified in hiera's configuration file.
+of data is driven by the hierarchy specified in Hiera's configuration file.
 
 Given the following hierarchy from hiera.yaml:
 
@@ -65,14 +83,26 @@ Given the following hierarchy from hiera.yaml:
       - common
 
 Hiera searches a set of files for data values that match a specific key. The data
-files that it searches are determined by using a set of global data to figure out
-which files form the hierarchy it should use.
+files that it searches are determined by interpolating each of these specified
+hierarchies using the current scope (or set of global variables).
+
+### Hiera Example
 
 Assume the following:
 
   * data will be searched from : /etc/puppet/data/hiera\_data
-  * the hierarchy in our hiera.yaml file is the same as above
-  * The following global variables are available to hiera
+  * hiera.yaml defines the following hierarchy:
+
+        ---
+        :hierarchy:
+          - "hostname/%{hostname}"
+          - user
+          - "osfamily/%{osfamily}"
+          - "db/%{db_type}"
+          - "scenario/%{scenario}"
+          - common
+
+  * The following global variables are passed to hiera as its scope:
 
         osfamily: redhat
         scenario: all_in_one
@@ -80,7 +110,7 @@ Assume the following:
 
 When hiera searches for that a specified key, it will do the following:
 
-1. Use the hierarchy from hiera.yaml together with global variables to build
+1. Use the hierarchy from hiera.yaml together with its scope to build
 out the list of files to search for the desired key.
   + /etc/puppet/data/hiera\_data/hostname/my\_host.domain.name.yaml
   + /etc/puppet/data/hiera\_data/user.yaml
@@ -88,18 +118,19 @@ out the list of files to search for the desired key.
   + /etc/puppet/data/hiera\_data/scenario/all\_in\_one.yaml
   + /etc/puppet/data/hiera\_data/common.yaml
 
-  > NOTE: In this example, the db\_type hierarchy is ignored because there is no
-  > global variable set for db\_type. If one of the specified files does not exist,
-  > it is also ignored.
+  > NOTE: In this example, the db\_type hierarchy omitted from the hierarchy
+  > because there is no global variable set for db\_type.
 
 2. Search those files in the same order as they are provided in hiera.yaml.
 This order also implies their lookup precedence. The first value that hiera
-finds is the value that is provided for that variable.
+finds in the hierarchy is returned as the value for that variable.
 
   For example, the value from my\_host.domain.name.yaml will always be used if
   available.
 
-### Variable interpolation
+  Any values from user.yaml are used if the host specific file does not exist.
+
+### Variable Interpolation
 
 Sometimes the value returned form a hiera value lookup is not a static string,
 or array, but a variable that should be interpolated from the current set
@@ -112,14 +143,17 @@ The value for that key would be *all_in_one*
 
 ### How this applies to the data model
 
-The data model is based on hiera, but has several sets of hiera data that are processed.
+The data model uses Hiera style hierarchical overrides to look up a user's
+deployment data.
 
-This data is processed via the hierarchy in hiera.yaml to determine:
+These overrides are used to determine more than just values for class
+parameters. The following types of data are resolved via hierarchical
+lookups.
 
 + what global data should be used to process data values
 + what roles exist as a part of the current deployment model
 + what classes should be applied as a part of a role
-+ what hiera data should be set for a class
++ what value should be provided for a given class parameter
 
 In fact, the data model is composed of the following parts that are processed in this order:
 
@@ -149,7 +183,7 @@ roles/profiles.
 The data layer is processed into a list of classes as well as data\_bindings
 that should be used to configure a node's class parameters.
 
-### Scenario Selection
+### Data Descriptions
 
 Config.yaml is used to store the deployment scenario currently in use.
 
@@ -164,6 +198,10 @@ It contains a single configuration:
    the set of nodes that will be provisioned for your deployment.
    Scenario is also passed to Puppet as a global variable and used to drive
    both interpolation as well as category selection in hiera.
+
+> NOTE: config.yaml also currently contains some data that is used by a separate
+> provisioning system. It is likely that scenario will be defined in it's own
+> configuration file.
 
 #### Debugging Scenario Selection
 
@@ -193,6 +231,8 @@ At least the following hierarchy is recommended for overrides of your globals:
     - "scenario/%{scenario}"
     - common
 
+The scope used for this lookup only contains the scenario key.
+
 Given the above hierarchy, the following files would be used to resolve your
 globals.
 
@@ -214,7 +254,7 @@ overrides:
 
 #### Debugging Globals
 
-Globals are required by almost everyone subcommand of the *puppet scenario*
+Globals are required by almost everyone subcommand of the ``puppet scenario``
 command. To see how globals are compiled, and what the current values are,
 run commands that require globals with --debug.
 
@@ -251,6 +291,10 @@ files:
 
 You can also insert custom hierarchies based on hiera\_global\_params to customize
 the way that roles can be overridden.
+
+> NOTE: Currently, this operation expects "scenarios/%{scenario}" to exist in your
+> hierarchy, but automatically modifies it to lookup **scenarios/scenario\_name.yaml**
+> instead of **scenarios/scenarios/scenario\_name.yaml**.
 
 #### Debugging Scenarios
 
@@ -326,7 +370,12 @@ would try to match
 
 **TODO: the role mappings do not currently support regex, but probably needs to**
 
-### Data Mappings
+### Resolving Variable Values
+
+The data model uses to sets of data in order to resolve the value for class
+parameters, data mappings and hiera data.
+
+#### Data Mappings
 
 Data mappings are used to express the way in which global variables from hiera
 can map to one or many class parameters.
@@ -370,18 +419,23 @@ follows:
 For each of those variables, the data-binding will call out to hiera when
 the classes are processed (if they are included)
 
-### Hiera Data
+> NOTE: another goal of the data mappings is to allow users to place to specify
+> all data that should be configured by an end user. This is more of an
+> experimental feature. More information on utilizing this can be found [here](#getting-required-user-configuration).
 
-hiera data is used to express what values are going to be used to
+#### Hiera Data
+
+Hiera data is used to express what values are going to be used to
 configure the roles of your scenarios.
 
 Hiera data is used to either express global keys (that were mapped to
 class parameters in the data mappings), or fully qualified class parameter
 namespaces.
 
-NOTE: at the moment, fully qualified variables are ignored from hiera\_data
-if they were defined in the data\_mappings. This is probably a bug (b/c they should
-probably override), but this is how it works at the moment.
+> NOTE: Class parameters explicitly specified using hiera\_data override
+> its setting through data bindings. In our previous example, explicitly
+> setting ``nova::verbose: true`` would override whatever verbose is set
+> to.
 
 ## Installation
 
