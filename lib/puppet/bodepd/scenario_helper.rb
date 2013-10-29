@@ -398,8 +398,12 @@ module Puppet
           Puppet.debug("Searching #{yamlfile} for keys")
           if File.exists?(yamlfile)
             config = YAML.load_file(yamlfile)
-            config.each do |k, v|
-              data = yield(k,v,data)
+            if ! config
+              Puppet.warning("Hiera file #{yamlfile} is empty. should contain a hash")
+            else
+              config.each do |k, v|
+                data = yield(k,v,data)
+              end
             end
           end
         end

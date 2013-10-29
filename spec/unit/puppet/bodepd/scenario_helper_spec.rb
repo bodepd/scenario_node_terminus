@@ -646,6 +646,13 @@ EOT
       compiled_keys['foo::somevar'].should == 'interpolation_%{foo}'
     end
 
+    it 'should not fail when a hiera file is empty' do
+      hiera_data = tmp_file('')
+      hiera_data_file_stubber('scenario/empty', hiera_data)
+      scope_hash = {'scenario' => 'scenario_name'}
+      compile_data_mappings(scope_hash)
+    end
+
   end
 
   describe 'when retrieving hierarchy' do
