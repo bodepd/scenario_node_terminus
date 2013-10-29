@@ -108,7 +108,7 @@ Assume the following:
         scenario: all_in_one
         hostname: my_host.domain.name
 
-When hiera searches for that a specified key, it will do the following:
+When hiera searches for a specified key, it will do the following:
 
 1. Use the hierarchy from hiera.yaml together with its scope to build
 out the list of files to search for the desired key.
@@ -163,7 +163,7 @@ In fact, the data model is composed of the following parts that are processed in
 * hiera data
 
 The following image shows both the processing order of each data type and the
-global variables used to determine how it's hierarchy is processed.
+global variables used to determine how its hierarchy is processed.
 
 ![](https://raw.github.com/bodepd/scenario_node_terminus/master/docs/images/data_model_scopes.png)
 
@@ -211,12 +211,12 @@ The following command returns the current scenario:
 
 ### Global Parameters
 
-This directory is used to specify the global variables that can be used
+The global_hiera_params directory is used to specify the global variables that can be used
 to effect the hierarchical overrides that will be used to determine both
 the classes contained in a scenario roles as well as the hiera overrides
 for both data mappings and the regular yaml hierarchy.
 
-To get a better understand of what global are and how they interact with hiera,
+To get a better understanding of what global are and how they interact with hiera,
 check out the following sections from this README:
 
 * [Hierarchies and Global Variables](#hierarchies-and-global-variables)
@@ -254,7 +254,7 @@ overrides:
 
 #### Debugging Globals
 
-Globals are required by almost everyone subcommand of the ``puppet scenario``
+Globals are required by almost every subcommand of the ``puppet scenario``
 command. To see how globals are compiled, and what the current values are,
 run commands that require globals with --debug.
 
@@ -326,13 +326,13 @@ called nova compute, then its class group might look like this:
     class_groups:
       - base
 
-Two things to note here:
+Three things to note here:
 
-1. The nova\_compute class group contains a list of classes that comprise nova compute
+1. The nova\_compute class group contains a list of classes that comprise nova\_compute
 2. Some of the classes use the hiera syntax for variable interpolation to
    set the names of classes used to the values provided from the
    hiera\_global\_params.
-3. class groups can themselves can contain class groups.
+3. Class groups can themselves can contain class groups.
 
 #### Debugging Class Groups
 
@@ -372,7 +372,7 @@ would try to match
 
 ### Resolving Variable Values
 
-The data model uses to sets of data in order to resolve the value for class
+The data model uses two sets of data in order to resolve the value for class
 parameters, data mappings and hiera data.
 
 #### Data Mappings
@@ -380,7 +380,7 @@ parameters, data mappings and hiera data.
 Data mappings are used to express the way in which global variables from hiera
 can map to one or many class parameters.
 
-Previous, this could be done with parameter forwarding in parameterized
+Previously, this could be done with parameter forwarding in parameterized
 classes, or by making explicit hiera calls.
 
 The example below, shows how parameterized class forwarding could be used
@@ -419,7 +419,7 @@ follows:
 For each of those variables, the data-binding will call out to hiera when
 the classes are processed (if they are included)
 
-> NOTE: another goal of the data mappings is to allow users to place to specify
+> NOTE: another goal of the data mappings is to allow users to specify
 > all data that should be configured by an end user. This is more of an
 > experimental feature. More information on utilizing this can be found [here](#getting-required-user-configuration).
 
@@ -480,7 +480,7 @@ The data model exists outside of Puppet and is forwarded to
 Puppet using a node terminus interface.
 
 It currently supports several commands that can be used to pre-generate
-parts of the data model for debugging purposes::
+parts of the data model for debugging purposes:
 
 ### Get Scenario
 
@@ -525,7 +525,7 @@ a single key can populate multiple class parameters, it also is used to
 signify all of the keys that should be exposed to an end user as a part of the
 basic configuraiton.
 
-### getting all current user data
+### Getting all current user data
 
 The following command can be used to provide a list of all data that a user
 may want to configure in their hiera\_data/user.yaml
@@ -541,7 +541,7 @@ are applicable to a specific role.
 
     puppet scenario get_user_inputs --role=build-server
 
-### allow users to interactively specify data
+### Allow users to interactively specify data
 
   NOTE: this is still a prototype and is not fully functional
 
