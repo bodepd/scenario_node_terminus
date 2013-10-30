@@ -619,31 +619,71 @@ EOT
 
   describe 'when compiling all data_mappings' do
 
-    before :each do
-      Puppet.stubs(:[]).with(:confdir).returns('/etc/puppet/')
-      # stub the expected hierarchy
-      self.expects('get_hierarchy').returns(["scenario/%{scenario}", 'common'])
-      # stub the expected files to be found
-      setup_data_mappings
+    describe 'when data files are valid' do
+
+      before :each do
+        Puppet.stubs(:[]).with(:confdir).returns('/etc/puppet/')
+        # stub the expected hierarchy
+        self.expects('get_hierarchy').returns(["scenario/%{scenario}", 'common'])
+        # stub the expected files to be found
+        setup_data_mappings
+      end
+
+      it 'should support basic lookups' do
+        scope_hash = {'scenario' => 'scenario_name', 'foo' => 'blah'}
+        compiled_keys = compile_data_mappings(scope_hash)
+        compiled_keys['var1'].should == 'duder'
+        compiled_keys['var2'].should == 'duder'
+      end
+
+      it 'should support overrides' do
+        scope_hash = {'scenario' => 'scenario_name', 'foo' => 'blah'}
+        compiled_keys = compile_data_mappings(scope_hash)
+        compiled_keys['bar::verbose'].should == 'debug'
+      end
+
+      it 'should not yet perform interpolation' do
+        scope_hash = {'scenario' => 'scenario_name', 'foo' => 'blah'}
+        compiled_keys = compile_data_mappings(scope_hash)
+        compiled_keys['foo::somevar'].should == 'interpolation_%{foo}'
+      end
+
     end
 
-    it 'should support basic lookups' do
-      scope_hash = {'scenario' => 'scenario_name', 'foo' => 'blah'}
-      compiled_keys = compile_data_mappings(scope_hash)
-      compiled_keys['var1'].should == 'duder'
-      compiled_keys['var2'].should == 'duder'
-    end
+    describe 'when data files are invalid' do
 
-    it 'should support overrides' do
-      scope_hash = {'scenario' => 'scenario_name', 'foo' => 'blah'}
-      compiled_keys = compile_data_mappings(scope_hash)
-      compiled_keys['bar::verbose'].should == 'debug'
-    end
+      describe 'when file is empty' do
+        before do
+          Puppet.stubs(:[]).with(:confdir).returns('/etc/puppet/')
+          # stub the expected hierarchy
+          self.expects('get_hierarchy').returns(["scenario/%{scenario}"])
+          @empty_hiera_data = tmp_file('')
+          hiera_data_file_stubber('scenario/empty', @empty_hiera_data)
+          data_mapper_file_stubber('scenario/empty', @empty_hiera_data)
+        end
 
-    it 'should not yet perform interpolation' do
-      scope_hash = {'scenario' => 'scenario_name', 'foo' => 'blah'}
-      compiled_keys = compile_data_mappings(scope_hash)
-      compiled_keys['foo::somevar'].should == 'interpolation_%{foo}'
+        it 'should not fail when a hiera file is empty' do
+          scope_hash = {'scenario' => 'empty'}
+          compile_data_mappings(scope_hash)
+        end
+      end
+
+      describe 'when file has a string' do
+        before do
+          Puppet.stubs(:[]).with(:confdir).returns('/etc/puppet/')
+          # stub the expected hierarchy
+          self.expects('get_hierarchy').returns(["scenario/%{scenario}"])
+          @empty_hiera_data = tmp_file('content')
+          hiera_data_file_stubber('scenario/empty', @empty_hiera_data)
+          data_mapper_file_stubber('scenario/empty', @empty_hiera_data)
+        end
+
+        it 'should not fail when a hiera file is empty' do
+          scope_hash = {'scenario' => 'empty'}
+          compile_data_mappings(scope_hash)
+        end
+      end
+
     end
 
   end
