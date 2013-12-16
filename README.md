@@ -492,7 +492,7 @@ Returns the currently configured scenario:
 
 Returns the list of roles for the current scenario along with their classes.
 
-    puppet scenario get_role
+    puppet scenario get_roles
 
 ### Get Classes per Role
 
