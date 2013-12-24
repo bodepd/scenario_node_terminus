@@ -1,4 +1,4 @@
-# Next-gen puppet-openstack tutorials
+# Flexible puppet-openstack
 
 ## Problem Statement
 

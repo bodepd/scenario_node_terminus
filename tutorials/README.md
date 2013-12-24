@@ -1,4 +1,4 @@
-# Next-gen puppet-openstack tutorials
+# Flexible puppet-openstack
 
 ## Problem Statement
 
@@ -122,9 +122,7 @@ This is how to change the data passed to a class based on which scenario is load
 
 #### Classes
 
-We included a small test class in the previous section, let's
-
-look at how we can use classes more effectively.
+We included a small test class in the previous section, let's look at how we can use classes more effectively.
 
 
 Make some more serious looking classes: nginx and django
@@ -132,9 +130,7 @@ Make some more serious looking classes: nginx and django
     mkdir -p /etc/puppet/modules/nginx/manifests
     mkdir -p /etc/puppet/modules/django/manifests
 
-Lets pretend this class sets up Nginx to act as a reverse proxy for
-
-A given downstream host+port
+Lets pretend this class sets up Nginx to act as a reverse proxy for A given downstream host+port
 
     cat > /etc/puppet/modules/nginx/manifests/server.pp<<EOF
     class nginx::server (
@@ -151,9 +147,7 @@ A given downstream host+port
     }
     EOF
 
-Lets pretend this deploys our django app and runs it on a particular
-
-host + port, and it requires an admin password to be specified
+Lets pretend this deploys our django app and runs it on a particular host + port, and it requires an admin password to be specified
 
     cat > /etc/puppet/modules/django/manifests/app.pp<<EOF
     class django::app(
@@ -187,13 +181,7 @@ Now let's run.
 
     puppet apply -e ""
 
-We need to specify the password for the django::app class!
-
-Take a look at the hiera order. We should add somewhere we
-
-can add user data. This should be above everything else in
-
-the order, so we can override defaults.
+We need to specify the password for the django::app class! Take a look at the hiera order. We should add somewhere we can add user data. This should be above everything else in the order, so we can override defaults.
 
     cat > /etc/puppet/hiera.yaml<<EOF
     ---
@@ -213,13 +201,7 @@ Now let's try that again
     puppet apply -e ""
 
 
-There is another abstraction we can use to group up classes.
-
-Let's say we have a number of classes we want to add to all
-
-of our nodes that are running django: one that installs supervisord
-
-and one that installs gunicorn.
+There is another abstraction we can use to group up classes. Let's say we have a number of classes we want to add to all of our nodes that are running django: one that installs supervisord and one that installs gunicorn.
 
 
     mkdir -p /etc/puppet/modules/gunicorn/manifests
@@ -238,9 +220,7 @@ and one that installs gunicorn.
     }
     EOF
 
-Django is a community module so we don't want to add includes there.
-
-We add them to the appserver role in the scenario yaml:
+Django is a community module so we don't want to add includes there. We add them to the appserver role in the scenario yaml:
 
     cat > /etc/puppet/data/scenarios/django.yaml<<EOF
     roles:
@@ -252,13 +232,7 @@ We add them to the appserver role in the scenario yaml:
           - supervisor::init
     EOF
 
-This is OK, but since the three classes at the bottom are essentially tied
-
-together, we can simplify the role by making a class group. The class group
-
-is matched by filename, so django_app.yaml will provide a class group of
-
-django_app
+This is OK, but since the three classes at the bottom are essentially tied together, we can simplify the role by making a class group. The class group is matched by filename, so django_app.yaml will provide a class group of django_app
 
     mkdir -p /etc/puppet/data/class_groups
     cat > /etc/puppet/data/class_groups/django_app.yaml<<EOF
@@ -279,32 +253,16 @@ Now update our scenario to use the new class group
           - nginx::server
     EOF
 
-Now we should get the same thing, but we've grouped classes together
-
-to form a logical unit. This can also be useful if you want to include
-
-something on all your nodes, like monitoring and alert software, by
-
-creating a base class_group that contains all the stuff that you want
-
-everywhere.
+Now we should get the same thing, but we've grouped classes together to form a logical unit. This can also be useful if you want to include something on all your nodes, like monitoring and alert software, by creating a class_group that contains all the stuff that you want everywhere.
 
     puppet apply -e ""
 
-So now we have nginx and django on one server,
+#### Mappings
 
-but they aren't talking to each other! We need
-
-to pass nginx a parameter to tell it where the
-
-downstream is.
+So now we have nginx and django on one server, but they aren't talking to each other! We need to pass nginx a parameter to tell it where the downstream is.
 
 
-this isn't user specific, it's going to happen
-
-for all users of the scenario, so we'll put it
-
-in %{scenario}.yaml
+this isn't user specific, it's going to happen for all users of the scenario, so we'll put it in %{scenario}.yaml
 
 
     echo "nginx::server::downstream_host: localhost" > /etc/puppet/data/hiera_data/django.yaml
@@ -312,30 +270,19 @@ in %{scenario}.yaml
 
     puppet apply -e ""
 
-So now nginx is proxying for our django app, which is good.
-
-Now let's say we want to run django on a different port.:
-
-This is a user customisation, so we'll keep it in user.yaml
+So now nginx is proxying for our django app, which is good. Now let's say we want to run django on a different port.: This is a user customisation, so we'll keep it in user.yaml
 
 
     echo "django::app::port: 6000" >> /etc/puppet/data/hiera_data/user.yaml
 
-OK, so we changed the django port and that worked, but nginx is still
-
-proxying for the old port. The solution to this is data mappings.
-
+OK, so we changed the django port and that worked, but nginx is still proxying for the old port. The solution to this is data mappings. 
 
 Set up data mappings in config:
 
     echo ":data_mapper:" >> /etc/puppet/hiera.yaml
     echo "  :datadir: /etc/puppet/data/data_mappings" >> /etc/puppet/hiera.yaml
 
-It will follow the same hierarchy as hiera - %scenario or user.yaml
-
-can be used under the data_mappings directory. We'll use the scenario
-
-since this seems like a generally applicable mapping.
+It will follow the same hierarchy as hiera - %scenario or user.yaml can be used under the data_mappings directory. We'll use the scenario since this seems like a generally applicable mapping.
 
     mkdir -p /etc/puppet/data/data_mappings
     cat > /etc/puppet/data/data_mappings/django.yaml<<EOF
@@ -361,9 +308,7 @@ This results in both django and nginx modules agreeing on port 6000.
 
 #### Global Parameters
 
-Globals can be used to change the classes present in a role .
-
-Let's say we want to add a DB backend to our django/rails app
+Globals can be used to change the classes present in a role. Let's say we want to add a DB backend to our django/rails app
 
 
 Make some more dummy classes:
@@ -393,25 +338,13 @@ mysql class
     }
     EOF
 
-Now, what we want is to be able to change our app between using mysql and postgres,
-
-but without necessarily changing the scenario. This means we don't have to make
-
-scenarios for every single combination, we can just change one line of yaml and
-
-reuse the same scenario for both databases.
+Now, what we want is to be able to change our app between using mysql and postgres, but without necessarily changing the scenario. This means we don't have to make scenarios for every single combination, we can just change one line of yaml and reuse the same scenario for both databases.
 
 
-First, we add the database choice into our heirarchy in hiera.yaml
-
-We also add a new file called common, that will be used for things
-
-that affect all deployments, not just the current scenario.
+First, we add the database choice into our heirarchy in hiera.yaml We also add a new file called common, that will be used for things that affect all deployments, not just the current scenario.
 
 
-We put common at the bottom, since in  practice, it's a collection of
-
-good defaults that the scenario and user may want to override
+We put common at the bottom, since in  practice, it's a collection of good defaults that the scenario and user may want to override
 
     cat > /etc/puppet/hiera.yaml<<EOF
     ---
@@ -430,9 +363,7 @@ Now, we make a new directory for our globals:
 
     mkdir -p /etc/puppet/data/global_hiera_params
 
-Now, because in our scenarios, we want to be able to choose a db,
-
-we put db_type into common.yaml
+Now, because in our scenarios, we want to be able to choose a db, we put db_type into common.yaml
 
     echo "db_type: postgres" >> /etc/puppet/data/global_hiera_params/common.yaml
 
@@ -448,11 +379,7 @@ Let's add our DB to the django scenario:
           - "%{db_type}::server"
     EOF
 
-if we do a puppet apply now, the class will be included, but we haven't set its parameter
-
-so it will fail. We have the db_type as part of the hierarchy, so we can add postgres.yaml
-
-to hiera_data.
+if we do a puppet apply now, the class will be included, but we haven't set its parameter so it will fail. We have the db_type as part of the hierarchy, so we can add postgres.yaml to hiera_data.
 
     echo "postgres::server::password: test" >> /etc/puppet/data/hiera_data/postgres.yaml
 
@@ -472,45 +399,15 @@ And test...
 
     puppet apply -e ""
 
-And we're done! This should give you an idea of how you can use globals to switch between
-
-classes that you know you're going to need. Maybe you want to support deploying with mysql/postgres
-
-or apache/nginx. You can create new scenarios for each combination, but scenarios are a heavier
-
-tool that is best use for describing the hostname->role mappings, whereas a global is a good way to
-
-switch between implementations of a role. So in our case, the role might be 'database' and the db_type
-
-global can switch between mysql and postgres. A data_mapping for common parameters (like admin password)
-
-would also help simplify switching between the two.
+And we're done! This should give you an idea of how you can use globals to switch between classes that you know you're going to need. Maybe you want to support deploying with mysql/postgres or apache/nginx. You can create new scenarios for each combination, but scenarios are a heavier tool that is best use for describing the hostname->role mappings, whereas a global is a good way to switch between implementations of a role. So in our case, the role might be 'database' and the db_type global can switch between mysql and postgres. A data_mapping for common parameters (like admin password) would also help simplify switching between the two.
 
 
 #### Globals that add classes
 
-Globals can also be used to add classes to roles.
-
-in the previous section we saw that we can swap
-
-which class is included by a role based on a global,
-
-but what if you want to sometimes add a class, and
-
-sometimes have nothing at all?
+Globals can also be used to add classes to roles. in the previous section we saw that we can swap which class is included by a role based on a global, but what if you want to sometimes add a class, and sometimes have nothing at all?
 
 
-An example of this is including debugging tools. Let's
-
-make a new class that includes systemtap, which we don't
-
-want on our prod servers, but which we do want on our QA
-
-servers. Using a global, we can have the same scenario
-
-for prod and QA, and change a single line of yaml to
-
-add our debugging tool to the QA servers.
+An example of this is including debugging tools. Let's make a new class that includes systemtap, which we don't want on our prod servers, but which we do want on our QA servers. Using a global, we can have the same scenario for prod and QA, and change a single line of yaml to add our debugging tool to the QA servers.
 
 
 Create our systemtap class
@@ -543,15 +440,11 @@ Update the heirarchy to support the debug choice
       :datadir: /etc/puppet/data/data_mappings
     EOF
 
-This will search for data in scenarios/debug/%{debug}, so let's make
-
-that directory
+This will search for data in scenarios/debug/%{debug}, so let's make that directory
 
     mkdir -p /etc/puppet/data/scenarios/debug
 
-Now, if debug is true, we want to add the systemtap::init class to the appserver
-
-role. We do that like so:
+Now, if debug is true, we want to add the systemtap::init class to the appserver role. We do that like so:
 
     cat > /etc/puppet/data/scenarios/debug/true.yaml<<EOF
     roles:
@@ -564,9 +457,7 @@ Now when we apply, we should see systemtap added.
 
     puppet apply -e ""
 
-If we set debug to anything other than true, it won't be added.
-
-because the file name won't be there
+If we set debug to anything other than true, it won't be added. because the file name won't be there
 
     echo "debug: not_true" > /etc/puppet/data/global_hiera_params/user.yaml
 
