@@ -1,3 +1,5 @@
+## Install
+
 # Get basic tools
 apt-get update
 apt-get install git vim puppet -y
@@ -14,3 +16,13 @@ git clone https://github.com/bodepd/scenario_node_terminus scenario_node_terminu
 
 # Install puppet 3.2.3
 puppet apply /vagrant/setup.pp
+
+# Create a testing module
+mkdir -p /etc/puppet/modules/testing/manifests
+cat > /etc/puppet/modules/testing/manifests/test.pp<<EOF
+class testing::test (
+  \$message = "I like nothing"
+) {
+    notice("Message is: \${message}")
+}
+EOF
