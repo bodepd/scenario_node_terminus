@@ -354,14 +354,28 @@ module Puppet
         end
         role_mappings = YAML.load_file(role_mapper)
         split_name = name.split('.')
-        split_name.size.times do |x|
-          cur_name = split_name[0..(split_name.size-x-1)].join('.')
-          role = role_mappings[cur_name]
-          if role
-            Puppet.debug("Found role from role mappings: #{role}")
-            return role
+
+        regexes = Hash.new
+        role_mappings.each do | role_match, role|
+          # Strip the regex of any wrapping slashes that might exist
+          role_match = role_match.sub(/^\//, '').sub(/\/$/, '')
+          begin
+            regexes[(Regexp.new(role_match))] = role
+          rescue => detail
+            raise ArgumentError, "Invalid regex in role_mappings '#{role_match}': #{detail}", detail.backtrace
           end
         end
+
+        split_name.size.times do |x|
+          cur_name = split_name[0..(split_name.size-x-1)].join('.')
+          regexes.each do | regex, role|
+            if ( cur_name =~ regex)
+              Puppet.debug("Found role from role mappings: #{role}")
+              return role
+            end
+          end
+        end
+
         Puppet.debug("Did not find role mapping for #{name}")
         return nil
       end
