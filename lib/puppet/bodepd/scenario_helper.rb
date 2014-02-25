@@ -253,6 +253,10 @@ module Puppet
         else
           raise(StandardError, 'config.yaml must exist')
         end
+        local_config_file = get_data_file(data_dir, 'config.local.yaml')
+        if File.exists?(local_config_file)
+          global_config.merge!(YAML.load_file(local_config_file))
+        end
         if ! global_config || ! global_config['scenario']
           raise(StandardError, 'scenario must be defined in config.yaml')
         end
