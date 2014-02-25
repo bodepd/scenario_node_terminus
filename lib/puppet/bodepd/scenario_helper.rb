@@ -185,7 +185,7 @@ module Puppet
               # I am not sure how forgiving I should be here...
               #
               if class_list.include?(get_namespace(k))
-                raise(Exception, "data mapping #{v} not found. Failing b/c it is required for class #{get_namespace(k)}")
+                raise(StandardError, "data mapping #{v} not found. Failing b/c it is required for class #{get_namespace(k)}")
               end
               Puppet.warning("data_mapping key: #{k} maps to #{v} which is not found in hiera data. This may not be an issue, b/c the class #{get_namespace(k)} is not included.")
               lookedup_data[k] = nil
@@ -251,10 +251,10 @@ module Puppet
         if File.exists?(global_config_file)
           global_config = YAML.load_file(global_config_file)
         else
-          raise(Exception, 'config.yaml must exist')
+          raise(StandardError, 'config.yaml must exist')
         end
         if ! global_config || ! global_config['scenario']
-          raise(Exception, 'scenario must be defined in config.yaml')
+          raise(StandardError, 'scenario must be defined in config.yaml')
         end
         Puppet.info("Found scenario: #{global_config['scenario']} in #{global_config_file}")
         Puppet.info("Using scenario to help determine hiera globals")
@@ -285,7 +285,7 @@ module Puppet
           end
         end
         unless hierarchy.include?("%{scenario}")
-          raise(Exception, "Having a hierachy named scenario is required")
+          raise(StandardError, "Having a hierachy named scenario is required")
         end
         data = get_keys_per_dir(scope, 'scenarios', hierarchy) do |k,v,data|
           if data == {}
@@ -321,7 +321,7 @@ module Puppet
           group_names.reduce([]) do |result, name|
             group_file = get_data_file(group_dir, "#{name}.yaml")
             unless File.exists?(group_file)
-              raise(Exception, "Group file #{group_file} does not exist")
+              raise(StandardError, "Group file #{group_file} does not exist")
             end
             class_group = YAML.load_file(group_file)
             result + process_classes(class_group, scope)
@@ -346,7 +346,7 @@ module Puppet
       def get_role(name)
         role_mapper = get_data_file(data_dir, 'role_mappings.yaml')
         unless File.exists?(role_mapper)
-          raise(Exception, "Role mapping file: #{role_mapper} should exist")
+          raise(StandardError, "Role mapping file: #{role_mapper} should exist")
         end
         role_mappings = YAML.load_file(role_mapper)
         split_name = name.split('.')
@@ -486,7 +486,7 @@ module Puppet
       def interpolate_string(string, scope)
         if string.is_a?(String)
           string.gsub(/%\{([^\}]*)\}/) do
-            scope[$1] || raise(Exception, "Interpolation for #{$1} failed")
+            scope[$1] || raise(StandardError, "Interpolation for #{$1} failed")
           end
         else
           string

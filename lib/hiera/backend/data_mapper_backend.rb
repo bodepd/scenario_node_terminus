@@ -11,7 +11,7 @@ class Hiera
       def lookup(key, scope, order_override, resolution_type)
         unless data_bindings = scope['node_data_bindings']
           raise(
-            Exception,
+            StandardError,
             "expected variable: #{node_data_bindings} to be set from node terminus"
           )
         end
