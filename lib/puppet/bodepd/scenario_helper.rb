@@ -78,12 +78,14 @@ module Puppet
 
         classification_info = {}
 
+        facts = find_facts(node_name)
+
         # get the global configuration
-        global_config = get_global_config
+        global_config = get_global_config(facts)
         classification_info[:parameters] = global_config
 
         # get classes from roles
-        role                  = get_role(node_name)
+        role = facts['role'] || get_role(node_name)
         global_config['role'] = role
 
         # get classes from scenario and role
@@ -91,7 +93,7 @@ module Puppet
         classification_info[:classes] = classes
 
         classification_info[:parameters]['node_data_bindings'] = compile_all_data(
-          find_facts(node_name).merge(global_config),
+          facts.merge(global_config),
           classes
         )
 
@@ -244,7 +246,7 @@ module Puppet
 
       # load the global config from $confdir/data/config.yaml
       # and verify that it specifies a scenario
-      def get_global_config
+      def get_global_config(facts={})
         # load the global configuration data
         global_config = {}
         global_config_file = get_data_file(data_dir, 'config.yaml')
@@ -253,9 +255,8 @@ module Puppet
         else
           raise(Exception, 'config.yaml must exist')
         end
-        if ! global_config || ! global_config['scenario']
-          raise(Exception, 'scenario must be defined in config.yaml')
-        end
+
+        global_config["scenario"] = facts['scenario'] || global_config["scenario"] || raise(Exception, 'scenario must be defined in config.yaml')
         Puppet.info("Found scenario: #{global_config['scenario']} in #{global_config_file}")
         Puppet.info("Using scenario to help determine hiera globals")
         overrides = get_global_hiera_data({'scenario' => global_config["scenario"]})
