@@ -479,7 +479,7 @@ module Puppet
         elsif data.is_a?(Array)
           interpolate_array(data, scope)
         elsif data.is_a?(Hash)
-          data
+          interpolate_hash(data, scope)
           #raise(Error, "Hiera interpolation of type: #{data.class} is not supported")
         end
       end
@@ -498,6 +498,15 @@ module Puppet
       # allows for interpolation of each string in an array
       def interpolate_array(a, scope={})
         result = (a || []).map {|x| interpolate_string(x, scope)}
+      end
+
+      # interpolates values (but not keys)
+      def interpolate_hash(a, scope={})
+        b = {}
+        a.each do |k, v|
+          b[k] = interpolate_data(v, scope)
+        end
+        b
       end
 
       def find_facts(certname)
