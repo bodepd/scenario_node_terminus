@@ -219,7 +219,7 @@ EOT
       end
       it 'should be able to interpolate inline classes' do
         node2 = get_node_from_name('node2')
-        node2[:classes].include?('baz').should be_true
+        node2[:classes].include?('baz').should be_truthy
       end
       it 'should support interpolation of class groups'
       it 'should not return classes for nodes without roles' do
@@ -302,7 +302,7 @@ EOT
         )
         roles['role2'].should == ['bar']
         ['one', 'two', 'three', 'five'].each do |x|
-          roles['role1'].include?(x).should be_true
+          roles['role1'].include?(x).should be_truthy
         end
       end
     end
