@@ -117,6 +117,7 @@ EOT
     )
     global_file_stubber('common', @global_common)
     global_file_stubber('scenario/scenario_name', @global_scenario)
+    global_file_stubber('scenario/blah', @global_scenario)
   end
 
   def setup_node_role_mapping
@@ -490,6 +491,15 @@ EOT
       config['foo'].should      == 'baz'
       config['blah'].should     == 'scenario_name'
       config['scenario'].should == 'scenario_name'
+    end
+    it 'should allow facts to override scenario' do
+      setup_config_test_data
+      setup_global_test_data
+      self.expects('get_hierarchy').returns(["scenario/%{scenario}", 'common'])
+      config = get_global_config({'scenario' => 'blah'})
+      config['foo'].should      == 'baz'
+      config['blah'].should     == 'blah'
+      config['scenario'].should == 'blah'
     end
 
   end
