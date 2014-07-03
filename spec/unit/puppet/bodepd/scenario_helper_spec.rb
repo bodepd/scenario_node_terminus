@@ -481,7 +481,7 @@ EOT
       self.expects(:get_data_file).with('/etc/puppet/data', 'config.yaml').returns(@empty_file)
       expect do
         get_global_config
-      end.to raise_error(Exception, /scenario must be defined in config\.yaml/)
+      end.to raise_error(Exception, /Global config file should contain a hash/)
     end
     it 'should load global settings' do
       setup_config_test_data
