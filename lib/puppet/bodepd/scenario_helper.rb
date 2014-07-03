@@ -252,6 +252,7 @@ module Puppet
         global_config_file = get_data_file(data_dir, 'config.yaml')
         if File.exists?(global_config_file)
           global_config = YAML.load_file(global_config_file)
+          raise(Exception, "Global config file should contain a hash, not a #{global_config.class}") unless global_config.class == Hash
         else
           raise(Exception, 'config.yaml must exist')
         end
