@@ -76,7 +76,7 @@ key: value
 overridable_key: default_value
 array:
   - one
-hash
+hash:
   one: two
 EOT
     )
